@@ -1,0 +1,35 @@
+{
+  "reports": [
+    {
+      "report_id": "PT-1001",
+      "submitted_at": "2026-04-27T00:19:35.008174",
+      "updated_at": "2026-04-27T00:20:11.515420",
+      "reporter_username": "user",
+      "reporter_display_name": "user",
+      "location": "Near Chinchwad Railway Station",
+      "animal_type": "dog",
+      "symptoms": [
+        "Panting heavily",
+        "Limping",
+        "Disoriented"
+      ],
+      "notes": "",
+      "weather_level": "moderate",
+      "event_time": "2026-04-20T12:15",
+      "geo_lat": "18.488013714285714",
+      "geo_lon": "73.8145305",
+      "reporter_image_name": null,
+      "has_image": false,
+      "severity_score": 69,
+      "severity_level": "High",
+      "urgency": "High-priority field response recommended soon.",
+      "status": "Acknowledged",
+      "ngo_note": "Team Dispatched. Thank you for the alert!",
+      "proof_image_name": null,
+      "proof_location": "",
+      "status_updated_at": "2026-04-27T00:20:11.515420",
+      "status_updated_by": "user"
+    }
+  ],
+  "next_id": 1002
+}

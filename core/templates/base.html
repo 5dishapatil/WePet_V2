@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}WePet — Climate Risk Intelligence{% endblock %}</title>
+    {% load static %}
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+<div class="app-layout">
+
+    <!-- ── Sidebar ─────────────────────────────────────────────────── -->
+    <aside class="sidebar">
+        <div class="logo-section">
+            <div class="logo-text">🐾 We<span class="logo-accent">Pet</span></div>
+            <div class="logo-sub">Climate Risk Intelligence</div>
+        </div>
+
+        {% if user.is_authenticated %}
+        <div class="user-card">
+            <div class="user-label">Signed in as</div>
+            <div class="user-name">{{ user.get_full_name|default:user.username }}</div>
+            <div class="user-email">{{ user.email }}</div>
+        </div>
+
+        <a href="{% url 'accounts:logout' %}" class="nav-btn logout-btn">🚪 Logout</a>
+
+        <div class="section-label" style="margin-top:20px;">MODE</div>
+
+        <a href="{% url 'pets:pet_owner' %}"
+           class="nav-btn {% if '/pets/' in request.path %}nav-active{% endif %}">
+            🐾 Pet Owner
+        </a>
+        <a href="{% url 'community:community' %}"
+           class="nav-btn {% if '/community/' in request.path %}nav-active{% endif %}">
+            🤝 Community
+        </a>
+        <a href="{% url 'ngo:ngo' %}"
+           class="nav-btn {% if '/ngo/' in request.path %}nav-active{% endif %}">
+            🏥 NGO / Shelter
+        </a>
+        {% else %}
+        <div class="section-label" style="margin-top:20px;">MODE</div>
+        <a href="{% url 'accounts:login' %}" class="nav-btn">🔐 Login / Sign Up</a>
+        {% endif %}
+
+        <hr class="pt-divider">
+
+        <div class="sidebar-info">
+            <strong style="color:#e2e8f0;">WePet</strong> is a climate risk
+            intelligence tool for pets and street animals.<br><br>
+            Weather data: Open-Meteo (free, no key).<br>
+            All risk logic is deterministic and breed-specific.<br><br>
+            <span style="color:#cbd5e1;">Not a veterinary service.</span>
+        </div>
+    </aside>
+
+    <!-- ── Main content ────────────────────────────────────────────── -->
+    <main class="main-content">
+        {% block content %}{% endblock %}
+    </main>
+
+</div>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,824 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Pet Owner — WePet{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ── Two-column layout ─────────────────────────────────────────────── */
+.po-layout {
+    display: grid;
+    grid-template-columns: 360px 1fr;
+    gap: 32px;
+    align-items: start;
+}
+@media (max-width: 900px) {
+    .po-layout { grid-template-columns: 1fr; }
+}
+.col-form { min-width: 0; }
+.col-results { min-width: 0; }
+
+/* ── Sub-score grid ───────────────────────────────────────────────── */
+.sub-scores-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+}
+@media (max-width: 1100px) {
+    .sub-scores-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 700px) {
+    .sub-scores-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ── Weather grid ─────────────────────────────────────────────────── */
+.weather-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+}
+@media (max-width: 1100px) {
+    .weather-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 700px) {
+    .weather-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ── Windows + Exposure row ──────────────────────────────────────── */
+.windows-exposure-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+@media (max-width: 900px) {
+    .windows-exposure-row { grid-template-columns: 1fr; }
+}
+
+/* ── Spinner ──────────────────────────────────────────────────────── */
+.spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255,255,255,0.2);
+    border-top-color: #3b82f6;
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+    vertical-align: middle;
+}
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+
+{{ dog_breeds|json_script:"dog-breeds-data" }}
+{{ cat_breeds|json_script:"cat-breeds-data" }}
+{{ form_state|json_script:"form-state-data" }}
+
+<div class="page-header">
+    <p class="page-title">🐾 Pet Owner</p>
+    <p class="page-subtitle">Real-time, breed-specific climate risk analysis for your pet.</p>
+</div>
+
+<div class="po-layout">
+
+    <!-- LEFT COLUMN -->
+    <div class="col-form">
+
+        {% if error %}
+        <div class="error-banner">❌ {{ error }}</div>
+        {% endif %}
+        {% if success_msg %}
+        <div class="success-banner">✅ {{ success_msg }}</div>
+        {% endif %}
+
+        <!-- SAVED PETS -->
+        {% if pets %}
+        <div class="section-label">🐾 SAVED PETS</div>
+        <div class="form-group">
+            <select class="form-select" id="saved-pet-select" onchange="loadSavedPet(this)">
+                <option value="">➕ Add New Pet</option>
+                {% for pet in pets %}
+                <option value="{{ pet.id }}"
+                        data-name="{{ pet.pet_name }}"
+                        data-species="{{ pet.species }}"
+                        data-breed="{{ pet.breed }}"
+                        data-age="{{ pet.age_group }}"
+                        data-overweight="{{ pet.overweight|yesno:'true,false' }}"
+                        data-heat="{{ pet.heat_sensitive|yesno:'true,false' }}"
+                        {% if form_state.selected_pet_id == pet.id|stringformat:"s" %}selected{% endif %}>
+                    {{ pet.pet_name }} ({{ pet.breed }})
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div id="saved-pet-info-banner" class="info-banner" style="display:none;margin-bottom:12px;"></div>
+
+        <div id="delete-pet-section" style="display:none;margin-bottom:12px;">
+            <form id="delete-pet-form" method="post" action="" data-delete-base="/pets/delete-pet/">
+                {% csrf_token %}
+                <button type="submit"
+                        class="btn btn-danger btn-sm"
+                        onclick="return confirm('Delete this pet profile?')">
+                    🗑 Delete This Pet
+                </button>
+            </form>
+        </div>
+        {% endif %}
+
+        <!-- MAIN FORM -->
+        <form id="main-form" method="post" action="{% url 'pets:analyze' %}" enctype="multipart/form-data">
+            {% csrf_token %}
+
+            <input type="hidden" name="selected_pet_id" id="selected_pet_id"
+                   value="{{ form_state.selected_pet_id|default:'' }}">
+            <input type="hidden" name="geo_lat" id="geo_lat" value="">
+            <input type="hidden" name="geo_lon" id="geo_lon" value="">
+            <input type="hidden" name="location_label" id="location_label" value="">
+            <input type="hidden" name="breed_name" id="breed_name_hidden"
+                   value="{{ form_state.breed_name|default:'' }}">
+
+            <!-- PET DETAILS -->
+            <div class="section-label">🐶 PET DETAILS</div>
+
+            <div class="form-group">
+                <label class="form-label">Pet Name</label>
+                <input class="form-input"
+                       type="text"
+                       id="pet_name"
+                       name="pet_name"
+                       value="{{ form_state.pet_name|default:'' }}"
+                       placeholder="e.g. Bruno, Luna, Max">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Species</label>
+                <select class="form-select" id="species_select" name="species" onchange="handleSpeciesChange()">
+                    <option value="Dog"
+                        {% if form_state.species == 'Dog' or not form_state.species %}selected{% endif %}>
+                        Dog
+                    </option>
+                    <option value="Cat"
+                        {% if form_state.species == 'Cat' %}selected{% endif %}>
+                        Cat
+                    </option>
+                    <option value="Don't know"
+                        {% if form_state.species == "Don't know" %}selected{% endif %}>
+                        Don't know
+                    </option>
+                </select>
+            </div>
+
+            <!-- Known breed section -->
+            <div id="known-breed-section">
+                <div class="form-group">
+                    <label class="form-label">Breed</label>
+                    <select class="form-select" id="breed_select" onchange="syncBreedHidden(this.value)">
+                    </select>
+                </div>
+
+                <div class="section-label">📷 PET PHOTO (OPTIONAL)</div>
+                <div class="form-group">
+                    <input type="file"
+                           class="form-file"
+                           name="pet_image_optional"
+                           id="pet_image_optional"
+                           accept=".jpg,.jpeg,.png">
+                    <div class="form-hint">
+                        Upload photo — optional. Breed selection above will be used.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Auto-detect section -->
+            <div id="auto-detect-section" style="display:none">
+                <div class="section-label">📷 AUTO IDENTIFY PET</div>
+
+                <div class="form-group">
+                    <input type="file"
+                           class="form-file"
+                           name="pet_image"
+                           id="pet_image_detect"
+                           accept=".jpg,.jpeg,.png"
+                           onchange="handleImageUpload(this)">
+                    <div class="form-hint">
+                        Upload a clear photo of your pet for auto-detection.
+                    </div>
+                </div>
+
+                <div id="detect-spinner" style="display:none;margin:8px 0;">
+                    <span class="spinner"></span>
+                    <span style="color:#94a3b8;font-size:0.88rem;margin-left:8px;">
+                        Identifying species &amp; breed…
+                    </span>
+                </div>
+
+                <div id="detect-result-banner" style="display:none;margin-bottom:12px;"></div>
+
+                <!-- fallback -->
+                <div id="fallback-section" style="display:none">
+                    <div class="form-group">
+                        <label class="form-label">Choose species manually</label>
+                        <select class="form-select" id="fallback_species"
+                                onchange="handleFallbackSpecies(this.value)">
+                            <option value="Dog">Dog</option>
+                            <option value="Cat">Cat</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Choose breed manually</label>
+                        <select class="form-select" id="fallback_breed"
+                                onchange="syncBreedHidden(this.value)">
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- LOCATION -->
+            <div class="section-label">📍 LOCATION</div>
+
+            <div class="form-group">
+                <div class="radio-group">
+                    <label class="radio-label">
+                        <input type="radio"
+                               name="location_mode"
+                               value="gps"
+                               id="gps_radio"
+                               onchange="handleLocationMode()"
+                               {% if form_state.location_mode != 'manual' %}checked{% endif %}>
+                        Use current location
+                    </label>
+
+                    <label class="radio-label">
+                        <input type="radio"
+                               name="location_mode"
+                               value="manual"
+                               id="manual_radio"
+                               onchange="handleLocationMode()"
+                               {% if form_state.location_mode == 'manual' %}checked{% endif %}>
+                        Enter manually
+                    </label>
+                </div>
+            </div>
+
+            <div id="gps-section">
+                <div id="gps-info-banner" class="info-banner">
+                    Click the button below to use your device's GPS location.
+                </div>
+                <div id="gps-success-banner" class="success-banner" style="display:none;"></div>
+                <div id="gps-error-banner" class="error-banner" style="display:none;"></div>
+
+                <button type="button"
+                        id="get-location-btn"
+                        class="btn btn-secondary"
+                        style="width:100%;margin-bottom:8px;"
+                        onclick="requestLocation()">
+                    📍 Get Current Location
+                </button>
+
+                <button type="button"
+                        id="refresh-location-btn"
+                        class="btn btn-secondary btn-sm"
+                        style="display:none;width:100%;margin-bottom:8px;"
+                        onclick="refreshLocation()">
+                    🔄 Refresh Location
+                </button>
+            </div>
+
+            <div id="manual-section" style="display:none">
+                <div class="form-group">
+                    <label class="form-label">City or location</label>
+                    <input class="form-input"
+                           type="text"
+                           name="location_text"
+                           id="location_text"
+                           value="{{ form_state.location_text|default:'' }}"
+                           placeholder="e.g. Pune, Mumbai, London">
+                </div>
+            </div>
+
+            <!-- PET CONDITION -->
+            <div class="section-label">🩺 PET CONDITION</div>
+
+            <div class="form-group">
+                <label class="form-label">Age Group</label>
+                <select class="form-select" name="age_group" id="age_group">
+                    <option value="Young" {% if form_state.age_group == 'Young' %}selected{% endif %}>Young</option>
+                    <option value="Adult" {% if form_state.age_group == 'Adult' or not form_state.age_group %}selected{% endif %}>Adult</option>
+                    <option value="Senior" {% if form_state.age_group == 'Senior' %}selected{% endif %}>Senior</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox"
+                           name="overweight"
+                           id="overweight_cb"
+                           {% if form_state.overweight %}checked{% endif %}>
+                    Overweight / Obese
+                </label>
+            </div>
+
+            <div class="form-group">
+                <label class="checkbox-label"
+                       title="Enable if your pet is especially vulnerable to heat — flat-faced breeds, thick-coated breeds, or pets with reduced heat tolerance.">
+                    <input type="checkbox"
+                           name="heat_sensitive"
+                           id="heat_sensitive_cb"
+                           {% if form_state.heat_sensitive %}checked{% endif %}>
+                    Heat-sensitive / Brachycephalic / Thick-coated / At-risk
+                </label>
+            </div>
+
+            <!-- BUTTONS -->
+            <button type="submit"
+                    formaction="{% url 'pets:save_pet' %}"
+                    class="btn btn-secondary"
+                    style="width:100%;margin-bottom:10px;"
+                    onclick="prepareSaveSubmit()">
+                💾 Save This Pet
+            </button>
+
+            <button type="submit"
+                    formaction="{% url 'pets:analyze' %}"
+                    class="btn btn-primary"
+                    style="width:100%;"
+                    onclick="prepareAnalyzeSubmit()">
+                🔍 Analyze Risk
+            </button>
+        </form>
+
+        {% if results %}
+        <div style="text-align:center;margin-top:12px;">
+            <a href="{% url 'pets:clear_results' %}"
+               style="font-size:0.8rem;color:#475569;text-decoration:none;">
+                ✕ Clear results
+            </a>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- RIGHT COLUMN -->
+    <div class="col-results">
+
+        {% if not results %}
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:320px;gap:12px;">
+            <div style="font-size:3rem;opacity:0.3;">🐾</div>
+            <div style="color:#475569;font-size:0.95rem;text-align:center;max-width:280px;line-height:1.6;">
+                Configure your pet details on the left and click
+                <strong style="color:#64748b;">Analyze Risk</strong> to get started.
+            </div>
+        </div>
+
+        {% else %}
+
+        <div class="section-label">📡 LIVE WEATHER CONDITIONS</div>
+        <div style="font-size:0.88rem;color:#64748b;margin-bottom:14px;">
+            📍 {{ results.location_display }}
+        </div>
+
+        <div class="weather-grid">
+            {% with c=results.current %}
+            <div class="metric-card">
+                <div style="font-size:1.3rem;margin-bottom:4px;">🌡️</div>
+                <div class="metric-value">{{ c.temperature|floatformat:1 }}<span class="metric-unit">°C</span></div>
+                <div class="metric-label">Temperature</div>
+            </div>
+            <div class="metric-card">
+                <div style="font-size:1.3rem;margin-bottom:4px;">🤔</div>
+                <div class="metric-value">{{ c.apparent_temperature|floatformat:1 }}<span class="metric-unit">°C</span></div>
+                <div class="metric-label">Feels Like</div>
+            </div>
+            <div class="metric-card">
+                <div style="font-size:1.3rem;margin-bottom:4px;">💧</div>
+                <div class="metric-value">{{ c.humidity|floatformat:0 }}<span class="metric-unit">%</span></div>
+                <div class="metric-label">Humidity</div>
+            </div>
+            <div class="metric-card">
+                <div style="font-size:1.3rem;margin-bottom:4px;">💨</div>
+                <div class="metric-value">{{ c.wind_speed|floatformat:0 }}<span class="metric-unit"> km/h</span></div>
+                <div class="metric-label">Wind</div>
+            </div>
+            <div class="metric-card">
+                <div style="font-size:1.3rem;margin-bottom:4px;">☀️</div>
+                <div class="metric-value">{{ c.uv_index|floatformat:0 }}</div>
+                <div class="metric-label">UV Index</div>
+            </div>
+            <div class="metric-card">
+                <div style="font-size:1.3rem;margin-bottom:4px;">{% if c.is_day %}🌤️{% else %}🌙{% endif %}</div>
+                <div class="metric-value" style="font-size:1rem;">{{ c.condition }}</div>
+                <div class="metric-label">Condition</div>
+            </div>
+            {% endwith %}
+        </div>
+
+        <hr class="pt-divider">
+
+        {% with rl=results.risk_level %}
+        <div class="risk-badge-block risk-{{ rl|lower }}">
+            <div style="display:flex;align-items:center;gap:12px;">
+                <span style="font-size:2rem;">
+                    {% if rl == 'Low' %}🟢{% elif rl == 'Moderate' %}🟡{% elif rl == 'High' %}🟠{% else %}🔴{% endif %}
+                </span>
+                <div>
+                    <div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:0.1em;color:#64748b;font-weight:600;">
+                        Overall Risk Level — {{ results.pet_name|default:"" }}
+                    </div>
+                    <div class="risk-level-text">{{ rl }}</div>
+                    <div style="font-size:0.8rem;color:#64748b;margin-top:2px;">
+                        Risk score: {{ results.overall_risk|floatformat:0 }}/100
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endwith %}
+
+        <div class="section-label">📊 RISK SUB-SCORES</div>
+        <div class="sub-scores-grid">
+            {% with ss=results.sub_scores %}
+            <div class="sub-score-card">
+                <div class="sub-score-title">🌡️ Heat Stress</div>
+                <div class="sub-score-value" data-score="{{ ss.heat_stress|floatformat:1 }}">
+                    {{ ss.heat_stress|floatformat:0 }}<span style="font-size:0.9rem;color:#475569;">/100</span>
+                </div>
+                <div class="score-bar-wrap"><div class="score-bar-fill" data-score="{{ ss.heat_stress|floatformat:1 }}"></div></div>
+            </div>
+
+            <div class="sub-score-card">
+                <div class="sub-score-title">💧 Dehydration</div>
+                <div class="sub-score-value" data-score="{{ ss.dehydration|floatformat:1 }}">
+                    {{ ss.dehydration|floatformat:0 }}<span style="font-size:0.9rem;color:#475569;">/100</span>
+                </div>
+                <div class="score-bar-wrap"><div class="score-bar-fill" data-score="{{ ss.dehydration|floatformat:1 }}"></div></div>
+            </div>
+
+            <div class="sub-score-card">
+                <div class="sub-score-title">😮‍💨 Respiratory</div>
+                <div class="sub-score-value" data-score="{{ ss.respiratory|floatformat:1 }}">
+                    {{ ss.respiratory|floatformat:0 }}<span style="font-size:0.9rem;color:#475569;">/100</span>
+                </div>
+                <div class="score-bar-wrap"><div class="score-bar-fill" data-score="{{ ss.respiratory|floatformat:1 }}"></div></div>
+            </div>
+
+            <div class="sub-score-card">
+                <div class="sub-score-title">🔥 {% if results.species == 'dog' %}Paw Burn{% else %}Surface Heat{% endif %}</div>
+                <div class="sub-score-value" data-score="{{ ss.surface_burn|floatformat:1 }}">
+                    {{ ss.surface_burn|floatformat:0 }}<span style="font-size:0.9rem;color:#475569;">/100</span>
+                </div>
+                <div class="score-bar-wrap"><div class="score-bar-fill" data-score="{{ ss.surface_burn|floatformat:1 }}"></div></div>
+            </div>
+
+            <div class="sub-score-card">
+                <div class="sub-score-title">🏠 Indoor Heat</div>
+                <div class="sub-score-value" data-score="{{ ss.indoor_heat|floatformat:1 }}">
+                    {{ ss.indoor_heat|floatformat:0 }}<span style="font-size:0.9rem;color:#475569;">/100</span>
+                </div>
+                <div class="score-bar-wrap"><div class="score-bar-fill" data-score="{{ ss.indoor_heat|floatformat:1 }}"></div></div>
+            </div>
+            {% endwith %}
+        </div>
+
+        <hr class="pt-divider">
+
+        <div class="windows-exposure-row">
+            <div>
+                <div class="section-label">🕐 BEST SAFE WINDOWS TODAY</div>
+                {% with w=results.windows %}
+                {% if w.indoor_only %}
+                <div style="background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.15);border-radius:12px;padding:16px 20px;text-align:center;">
+                    <div style="font-size:1rem;font-weight:600;color:#f87171;">🏠 No safe outdoor window today</div>
+                    <div style="font-size:0.85rem;color:#64748b;margin-top:6px;">{{ w.message }}</div>
+                </div>
+                {% elif not w.windows %}
+                <div class="pt-card-sm" style="text-align:center;">
+                    <div style="color:#64748b;font-size:0.88rem;">{{ w.message }}</div>
+                </div>
+                {% else %}
+                {% for win in w.windows %}
+                <div class="window-card" style="margin-bottom:10px;">
+                    <div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:0.1em;color:#4ade80;font-weight:600;margin-bottom:6px;">
+                        SAFE WINDOW
+                    </div>
+                    <div class="window-time">{{ win.window }}</div>
+                    <div style="font-size:0.8rem;color:#64748b;margin-top:6px;">
+                        Avg apparent: {{ win.avg_apparent|floatformat:1 }}°C ·
+                        Risk: {{ win.avg_risk|floatformat:0 }}/100
+                    </div>
+                </div>
+                {% endfor %}
+                {% endif %}
+                {% endwith %}
+            </div>
+
+            <div>
+                <div class="section-label">⏱️ MAX OUTDOOR EXPOSURE</div>
+                {% with e=results.exposure %}
+                <div class="exposure-card">
+                    <div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:0.1em;color:#90cdf4;font-weight:600;margin-bottom:8px;">
+                        MAX OUTDOOR EXPOSURE
+                    </div>
+                    <div class="exposure-label">{{ e.label }}</div>
+                    <div style="font-size:0.8rem;color:#64748b;margin-top:6px;">{{ e.description }}</div>
+                </div>
+                {% endwith %}
+            </div>
+        </div>
+
+        {% if results.drivers %}
+        <div class="section-label">🔍 HIDDEN RISK DRIVERS</div>
+        {% for driver in results.drivers %}
+        <div class="driver-card">{{ driver }}</div>
+        {% endfor %}
+        {% endif %}
+
+        {% if results.recs %}
+        <div class="section-label">💡 BREED-SPECIFIC RECOMMENDATIONS</div>
+        {% for rec in results.recs %}
+        <div class="rec-card">
+            <div class="rec-category">{{ rec.icon }} {{ rec.category }}</div>
+            <div class="rec-advice">{{ rec.advice }}</div>
+            <div class="rec-why">Why: {{ rec.why }}</div>
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        {% with em=results.emergency %}
+        <div class="section-label">🚨 EMERGENCY WATCH</div>
+        <div class="emergency-card">
+            <div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:0.1em;color:#f87171;font-weight:600;margin-bottom:12px;">
+                🚨 EMERGENCY WATCH SIGNS
+            </div>
+
+            <div style="margin-bottom:12px;">
+                {% for sign in em.signs %}
+                <span class="warning-sign">⚠ {{ sign }}</span>
+                {% endfor %}
+            </div>
+
+            <div style="font-size:0.85rem;color:#fca5a5;line-height:1.6;margin-bottom:8px;">
+                {{ em.safe_note }}
+            </div>
+
+            <div style="font-size:0.76rem;color:#64748b;font-style:italic;">
+                {{ em.disclaimer }}
+            </div>
+        </div>
+        {% endwith %}
+
+        {% endif %}
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/location.js' %}"></script>
+<script src="{% static 'js/breed_detect.js' %}"></script>
+
+<script>
+const DOG_BREEDS = JSON.parse(document.getElementById('dog-breeds-data').textContent);
+const CAT_BREEDS = JSON.parse(document.getElementById('cat-breeds-data').textContent);
+const FORM_STATE = JSON.parse(document.getElementById('form-state-data').textContent) || {};
+
+document.addEventListener('DOMContentLoaded', function () {
+    handleSpeciesChange();
+    colorScoreBars();
+
+    const savedBreed = FORM_STATE.breed_name || '';
+    if (savedBreed) {
+        const species = document.getElementById('species_select').value;
+
+        if (species !== "Don't know") {
+            const sel = document.getElementById('breed_select');
+            if (sel) {
+                let found = false;
+                for (let i = 0; i < sel.options.length; i++) {
+                    if (sel.options[i].value === savedBreed) {
+                        sel.value = savedBreed;
+                        found = true;
+                        break;
+                    }
+                }
+                if (found) {
+                    syncBreedHidden(savedBreed);
+                }
+            }
+        } else {
+            syncBreedHidden(savedBreed);
+        }
+    }
+
+    const savedPetSel = document.getElementById('saved-pet-select');
+    if (savedPetSel && savedPetSel.value) {
+        updateSavedPetUI(savedPetSel);
+    }
+});
+
+function handleSpeciesChange() {
+    const species = document.getElementById('species_select').value;
+    const knownSection = document.getElementById('known-breed-section');
+    const detectSection = document.getElementById('auto-detect-section');
+    const fallbackSection = document.getElementById('fallback-section');
+    const detectBanner = document.getElementById('detect-result-banner');
+
+    if (species === "Don't know") {
+        knownSection.style.display = 'none';
+        detectSection.style.display = '';
+
+        // Only clear if no existing detected/manual breed is present
+        const hidden = document.getElementById('breed_name_hidden');
+        if (!hidden.value) {
+            syncBreedHidden('');
+        }
+    } else {
+        knownSection.style.display = '';
+        detectSection.style.display = 'none';
+
+        if (fallbackSection) fallbackSection.style.display = 'none';
+        if (detectBanner) detectBanner.style.display = 'none';
+
+        populateBreedSelect(species, 'breed_select');
+    }
+}
+
+function populateBreedSelect(species, selectId, selectedBreed) {
+    const sel = document.getElementById(selectId);
+    if (!sel) return;
+
+    const breeds = (species === 'Cat') ? CAT_BREEDS : DOG_BREEDS;
+    sel.innerHTML = '';
+
+    breeds.forEach(function (b) {
+        const opt = new Option(b, b);
+        sel.appendChild(opt);
+    });
+
+    const currentHidden = document.getElementById('breed_name_hidden').value || '';
+    const toSelect = selectedBreed || currentHidden || FORM_STATE.breed_name || '';
+
+    let found = false;
+    if (toSelect) {
+        for (let i = 0; i < sel.options.length; i++) {
+            if (sel.options[i].value === toSelect) {
+                sel.value = toSelect;
+                found = true;
+                break;
+            }
+        }
+    }
+
+    if (!found && sel.options.length > 0) {
+        sel.value = sel.options[0].value;
+    }
+
+    syncBreedHidden(sel.value);
+}
+
+function syncBreedHidden(val) {
+    document.getElementById('breed_name_hidden').value = val || '';
+}
+
+function handleFallbackSpecies(species) {
+    populateBreedSelect(species, 'fallback_breed');
+}
+
+function loadSavedPet(sel) {
+    const opt = sel.options[sel.selectedIndex];
+
+    const delSection = document.getElementById('delete-pet-section');
+    const infoDiv = document.getElementById('saved-pet-info-banner');
+
+    if (!opt.value) {
+        if (delSection) delSection.style.display = 'none';
+        if (infoDiv) infoDiv.style.display = 'none';
+
+        document.getElementById('selected_pet_id').value = '';
+        document.getElementById('pet_name').value = '';
+        document.getElementById('species_select').value = 'Dog';
+        handleSpeciesChange();
+        document.getElementById('age_group').value = 'Adult';
+        document.getElementById('overweight_cb').checked = false;
+        document.getElementById('heat_sensitive_cb').checked = false;
+
+        const breedSel = document.getElementById('breed_select');
+        if (breedSel && breedSel.value) {
+            syncBreedHidden(breedSel.value);
+        } else {
+            syncBreedHidden('');
+        }
+
+        return;
+    }
+
+    document.getElementById('selected_pet_id').value = opt.value;
+
+    if (delSection) {
+        const deleteForm = document.getElementById('delete-pet-form');
+        if (deleteForm) {
+            const base = deleteForm.dataset.deleteBase || '/pets/delete-pet/';
+            deleteForm.action = base + opt.value + '/';
+        }
+        delSection.style.display = '';
+    }
+
+    document.getElementById('pet_name').value = opt.dataset.name || '';
+
+    const species = opt.dataset.species || 'Dog';
+    document.getElementById('species_select').value = species;
+    handleSpeciesChange();
+
+    setTimeout(function () {
+        const breedSel = document.getElementById('breed_select');
+        if (breedSel) {
+            const targetBreed = opt.dataset.breed || '';
+            let found = false;
+
+            for (let i = 0; i < breedSel.options.length; i++) {
+                if (breedSel.options[i].value === targetBreed) {
+                    breedSel.value = targetBreed;
+                    found = true;
+                    break;
+                }
+            }
+
+            if (found) {
+                syncBreedHidden(breedSel.value);
+            }
+        }
+    }, 20);
+
+    document.getElementById('age_group').value = opt.dataset.age || 'Adult';
+    document.getElementById('overweight_cb').checked = opt.dataset.overweight === 'true';
+    document.getElementById('heat_sensitive_cb').checked = opt.dataset.heat === 'true';
+
+    if (infoDiv) {
+        infoDiv.textContent = '✔ Using saved pet: ' + opt.dataset.name +
+                              ' · ' + species + ' · ' + (opt.dataset.breed || '');
+        infoDiv.style.display = '';
+    }
+}
+
+function updateSavedPetUI(sel) {
+    loadSavedPet(sel);
+}
+
+function prepareSaveSubmit() {
+    ensureFinalBreedSync();
+}
+
+function prepareAnalyzeSubmit() {
+    ensureFinalBreedSync();
+}
+
+function ensureFinalBreedSync() {
+    const species = document.getElementById('species_select').value;
+
+    if (species === "Don't know") {
+        const fallbackSection = document.getElementById('fallback-section');
+        const fallbackBreed = document.getElementById('fallback_breed');
+
+        if (fallbackSection &&
+            fallbackSection.style.display !== 'none' &&
+            fallbackBreed &&
+            fallbackBreed.value) {
+            syncBreedHidden(fallbackBreed.value);
+        }
+
+        // If auto-detection already set hidden breed, keep it as-is.
+        return;
+    }
+
+    const breedSel = document.getElementById('breed_select');
+    if (breedSel && breedSel.value) {
+        syncBreedHidden(breedSel.value);
+    }
+}
+
+function colorScoreBars() {
+    document.querySelectorAll('.score-bar-fill').forEach(function (el) {
+        const score = parseFloat(el.dataset.score || 0);
+        el.style.width = Math.min(score, 100) + '%';
+        el.style.background = scoreColor(score);
+    });
+
+    document.querySelectorAll('.sub-score-value').forEach(function (el) {
+        const score = parseFloat(el.dataset.score || 0);
+        el.style.color = scoreColor(score);
+    });
+}
+
+function scoreColor(s) {
+    if (s < 25) return '#22c55e';
+    if (s < 50) return '#f59e0b';
+    if (s < 75) return '#f97316';
+    return '#ef4444';
+}
+</script>
+{% endblock %}

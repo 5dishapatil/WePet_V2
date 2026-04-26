@@ -1,0 +1,444 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Community — WePet{% endblock %}
+
+{% block extra_css %}
+<style>
+.community-layout {
+    display:grid;
+    grid-template-columns:320px 1fr;
+    gap:32px;
+    align-items:start;
+}
+@media (max-width: 980px) {
+    .community-layout { grid-template-columns:1fr; }
+}
+.tab-bar { display:flex; gap:8px; margin-bottom:20px; flex-wrap:wrap; }
+.tab-btn {
+    padding:10px 18px; border-radius:10px; cursor:pointer;
+    background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08);
+    color:#94a3b8; font-size:0.9rem; font-weight:500;
+    transition:all 0.15s;
+}
+.tab-btn:hover { background:rgba(255,255,255,0.08); color:#e2e8f0; }
+.tab-btn.tab-active {
+    background:rgba(59,130,246,0.15); color:#93c5fd;
+    border-color:rgba(59,130,246,0.3);
+}
+.tab-panel { display:none; }
+.tab-panel.active { display:block; }
+
+.report-card {
+    background:rgba(255,255,255,0.03);
+    border:1px solid rgba(255,255,255,0.08);
+    border-left:4px solid #64748b;
+    border-radius:14px;
+    padding:16px 18px;
+    margin-bottom:14px;
+}
+.report-card.risk-low { border-left-color:#22c55e; }
+.report-card.risk-moderate { border-left-color:#f59e0b; }
+.report-card.risk-high { border-left-color:#f97316; }
+.report-card.risk-critical { border-left-color:#ef4444; }
+
+.status-chip {
+    display:inline-block;
+    padding:6px 10px;
+    border-radius:999px;
+    font-size:0.75rem;
+    font-weight:600;
+    letter-spacing:0.03em;
+    border:1px solid rgba(255,255,255,0.08);
+}
+.status-no-response { background:rgba(100,116,139,0.12); color:#cbd5e1; }
+.status-acknowledged { background:rgba(59,130,246,0.12); color:#93c5fd; }
+.status-on-hold { background:rgba(245,158,11,0.12); color:#fcd34d; }
+.status-action-taken { background:rgba(34,197,94,0.12); color:#86efac; }
+
+.symptom-grid {
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+    margin-bottom:16px;
+}
+@media (max-width: 700px) {
+    .symptom-grid { grid-template-columns:1fr; }
+}
+.symptom-checkbox {
+    display:flex; align-items:center; gap:8px;
+    padding:10px 12px; border-radius:8px;
+    background:rgba(255,255,255,0.03);
+    border:1px solid rgba(255,255,255,0.07);
+    cursor:pointer; font-size:0.88rem; color:#94a3b8;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <p class="page-title">🤝 Community</p>
+    <p class="page-subtitle">Help street animals survive heat — and raise real rescue alerts when needed.</p>
+</div>
+
+<div class="community-layout">
+
+    <!-- LEFT -->
+    <div>
+        {% if error %}
+        <div class="error-banner">❌ {{ error }}</div>
+        {% endif %}
+        {% if success %}
+        <div class="success-banner">✅ {{ success }}</div>
+        {% endif %}
+
+        <div class="section-label">🏆 YOUR IMPACT</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+            <div class="metric-card">
+                <div style="font-size:1.2rem;margin-bottom:4px;">⭐</div>
+                <div class="metric-value">{{ total_pts }}</div>
+                <div class="metric-label">Total Points</div>
+            </div>
+            <div class="metric-card">
+                <div style="font-size:1.2rem;margin-bottom:4px;">🔥</div>
+                <div class="metric-value">{{ streak }}</div>
+                <div class="metric-label">Day Streak</div>
+            </div>
+        </div>
+
+        <div style="font-size:0.78rem;color:#475569;line-height:1.6;
+                    padding:10px 14px;background:rgba(255,255,255,0.03);border-radius:8px;">
+            💡 Community actions help daily. Distress alerts create accountable rescue tickets for NGOs.
+        </div>
+    </div>
+
+    <!-- RIGHT -->
+    <div>
+        <div class="tab-bar">
+            <button type="button" class="tab-btn tab-active" onclick="switchCommunityTab('task', this)">
+                🌤️ Daily Task
+            </button>
+            <button type="button" class="tab-btn" onclick="switchCommunityTab('report', this)">
+                🚨 Submit Distress Alert
+            </button>
+            <button type="button" class="tab-btn" onclick="switchCommunityTab('myreports', this)">
+                📋 My Alerts
+            </button>
+        </div>
+
+        <!-- TAB 1: TASK -->
+        <div id="community-tab-task" class="tab-panel active">
+            <div class="section-label">📍 YOUR LOCATION</div>
+
+            <form method="post" action="{% url 'community:fetch_task' %}">
+                {% csrf_token %}
+                <div class="form-group">
+                    <input class="form-input" type="text" name="location"
+                           placeholder="e.g. Pune, Chennai, Hyderabad"
+                           value="{{ comm_data.location_raw|default:'' }}">
+                </div>
+                <button type="submit" class="btn btn-primary" style="width:100%;">
+                    🌤️ Get Today's Task
+                </button>
+            </form>
+
+            {% if not comm_data %}
+            <div style="display:flex;flex-direction:column;align-items:center;
+                        justify-content:center;height:260px;gap:12px;">
+                <div style="font-size:3rem;opacity:0.3;">🤝</div>
+                <div style="color:#475569;font-size:0.95rem;text-align:center;
+                            max-width:280px;line-height:1.6;">
+                    Enter your location and click
+                    <strong style="color:#64748b;">Get Today's Task</strong>
+                    to see how you can help today.
+                </div>
+            </div>
+            {% else %}
+            {% with c=comm_data.current %}
+            <div class="section-label" style="margin-top:20px;">
+                🌡️ CONDITIONS IN {{ comm_data.location_display|upper }}
+            </div>
+
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px;">
+                <div class="metric-card">
+                    <div style="font-size:1.1rem;margin-bottom:2px;">🌡️</div>
+                    <div class="metric-value">{{ c.temperature|floatformat:1 }}<span class="metric-unit">°C</span></div>
+                    <div class="metric-label">Temperature</div>
+                </div>
+                <div class="metric-card">
+                    <div style="font-size:1.1rem;margin-bottom:2px;">🤔</div>
+                    <div class="metric-value">{{ c.apparent_temperature|floatformat:1 }}<span class="metric-unit">°C</span></div>
+                    <div class="metric-label">Feels Like</div>
+                </div>
+                <div class="metric-card">
+                    <div style="font-size:1.1rem;margin-bottom:2px;">💧</div>
+                    <div class="metric-value">{{ c.humidity|floatformat:0 }}<span class="metric-unit">%</span></div>
+                    <div class="metric-label">Humidity</div>
+                </div>
+                <div class="metric-card">
+                    <div style="font-size:1.1rem;margin-bottom:2px;">☀️</div>
+                    <div class="metric-value">{{ c.uv_index|floatformat:0 }}</div>
+                    <div class="metric-label">UV Index</div>
+                </div>
+            </div>
+
+            {% with hl=comm_data.heat_level %}
+            <div class="risk-badge-block risk-{{ hl|lower }}" style="margin-bottom:20px;">
+                <div style="display:flex;align-items:center;gap:12px;">
+                    <span style="font-size:1.6rem;">
+                        {% if hl == 'Low' %}🟢{% elif hl == 'Moderate' %}🟡{% elif hl == 'High' %}🟠{% else %}🔴{% endif %}
+                    </span>
+                    <div>
+                        <div style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.1em;
+                                    color:#64748b;font-weight:600;">Community Heat Level</div>
+                        <div class="risk-level-text">
+                            {{ hl }}
+                            <span style="font-size:0.85rem;font-weight:400;color:#64748b;">
+                                ({{ comm_data.heat_score|floatformat:0 }}/100)
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endwith %}
+
+            {% with t=comm_data.task %}
+            <div class="task-card">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;
+                            margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+                    <div style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.12em;
+                                color:#63b3ed;font-weight:600;">TODAY'S TASK</div>
+                    <span class="points-badge">+{{ t.points }} pts &nbsp;·&nbsp; ⏱ {{ t.effort }}</span>
+                </div>
+                <div style="font-size:1.1rem;font-weight:600;color:#f1f5f9;
+                            line-height:1.5;margin-bottom:10px;">
+                    {{ t.task }}
+                </div>
+                <div style="font-size:0.85rem;color:#94a3b8;line-height:1.6;margin-bottom:14px;">
+                    <strong style="color:#64748b;">Why it matters:</strong>
+                    {{ t.why }}
+                </div>
+                <div style="font-size:0.82rem;color:#63b3ed;border-top:1px solid rgba(255,255,255,0.06);
+                            padding-top:12px;">
+                    {{ comm_data.best_time }}
+                </div>
+            </div>
+            {% endwith %}
+
+            {% if not comm_data.completed %}
+            <form method="post" action="{% url 'community:complete_task' %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-primary" style="width:100%;">
+                    ✅ I completed this task!
+                </button>
+            </form>
+            {% else %}
+            <div style="background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.25);
+                        border-radius:14px;padding:20px 24px;text-align:center;margin-bottom:16px;">
+                <div style="font-size:2rem;margin-bottom:8px;">🎉</div>
+                <div style="font-size:1.05rem;font-weight:600;color:#4ade80;margin-bottom:6px;">
+                    Task complete! +{{ comm_data.task.points }} points earned.
+                </div>
+                <div style="font-size:0.85rem;color:#64748b;">
+                    Every action you take makes a real difference for animals nearby.
+                </div>
+            </div>
+            {% endif %}
+            {% endwith %}
+            {% endif %}
+        </div>
+
+        <!-- TAB 2: SUBMIT DISTRESS -->
+        <div id="community-tab-report" class="tab-panel">
+            <div class="section-label">🚨 SUBMIT DISTRESS ALERT</div>
+            <div class="info-banner" style="margin-bottom:14px;">
+                Report a street animal in distress. This creates a visible ticket for NGOs/shelters.
+            </div>
+
+            <form method="post" action="{% url 'community:submit_distress' %}" enctype="multipart/form-data">
+                {% csrf_token %}
+
+                <input type="hidden" name="geo_lat" id="distress_geo_lat">
+                <input type="hidden" name="geo_lon" id="distress_geo_lon">
+
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                    <div class="form-group">
+                        <label class="form-label">Location of animal</label>
+                        <input class="form-input" type="text" name="distress_location" id="distress_location"
+                               placeholder="e.g. Near FC Road signal, Pune">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Animal Type</label>
+                        <select class="form-select" name="animal_type">
+                            <option value="dog">Dog</option>
+                            <option value="cat">Cat</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                    <div class="form-group">
+                        <label class="form-label">Heat conditions in area</label>
+                        <select class="form-select" name="heat_level">
+                            <option value="low">Low</option>
+                            <option value="moderate" selected>Moderate</option>
+                            <option value="high">High</option>
+                            <option value="critical">Critical</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Observed time</label>
+                        <input class="form-input" type="datetime-local" name="event_time">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Observed symptoms</label>
+                    <div class="symptom-grid">
+                        {% for symptom in distress_symptoms %}
+                        <label class="symptom-checkbox">
+                            <input type="checkbox" name="symptoms" value="{{ symptom }}">
+                            {{ symptom }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Notes (optional)</label>
+                    <textarea class="form-textarea" name="notes" rows="4"
+                              placeholder="e.g. Dog lying under parked car, not responding properly, heavy panting..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Photo proof (optional but recommended)</label>
+                    <input type="file" class="form-file" name="photo" accept=".jpg,.jpeg,.png">
+                </div>
+
+                <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+                    <button type="button" class="btn btn-secondary" onclick="captureDistressLocation()">
+                        📍 Use My Current Location
+                    </button>
+                    <span id="distress-location-banner" style="font-size:0.82rem;color:#94a3b8;align-self:center;"></span>
+                </div>
+
+                <button type="submit" class="btn btn-primary" style="width:100%;">
+                    🚨 Submit Distress Alert
+                </button>
+            </form>
+        </div>
+
+        <!-- TAB 3: MY ALERTS -->
+        <div id="community-tab-myreports" class="tab-panel">
+            <div class="section-label">📋 MY SUBMITTED ALERTS</div>
+
+            {% if not my_reports %}
+            <div style="text-align:center;padding:50px 20px;color:#475569;font-size:0.92rem;">
+                <div style="font-size:2.5rem;opacity:0.3;margin-bottom:12px;">📋</div>
+                You haven't submitted any distress alerts yet.
+            </div>
+            {% else %}
+                {% for report in my_reports %}
+                <div class="report-card risk-{{ report.severity_level|lower }}">
+                    <div style="display:flex;justify-content:space-between;align-items:start;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+                        <div>
+                            <div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:0.08em;color:#64748b;font-weight:600;">
+                                {{ report.report_id }}
+                            </div>
+                            <div style="font-size:0.8rem;color:#94a3b8;">
+                                Submitted: {{ report.submitted_at|slice:":16" }}
+                            </div>
+                        </div>
+
+                        {% with s=report.status %}
+                        <span class="status-chip
+                            {% if s == 'Acknowledged' %}status-acknowledged
+                            {% elif s == 'On Hold' %}status-on-hold
+                            {% elif s == 'Action Taken' %}status-action-taken
+                            {% else %}status-no-response{% endif %}">
+                            {{ s }}
+                        </span>
+                        {% endwith %}
+                    </div>
+
+                    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px;">
+                        <span class="info-chip">📍 {{ report.location }}</span>
+                        <span class="info-chip">🐾 {{ report.animal_type|title }}</span>
+                        <span class="info-chip">Severity: {{ report.severity_level }}</span>
+                    </div>
+
+                    <div style="font-size:0.82rem;color:#94a3b8;margin-bottom:6px;">
+                        <strong style="color:#64748b;">Urgency:</strong> {{ report.urgency }}
+                    </div>
+
+                    {% if report.ngo_note %}
+                    <div style="font-size:0.82rem;color:#94a3b8;margin-bottom:6px;">
+                        <strong style="color:#64748b;">NGO Note:</strong> {{ report.ngo_note }}
+                    </div>
+                    {% endif %}
+
+                    {% if report.status == "Action Taken" %}
+                    <div class="success-banner" style="margin-top:10px;">
+                        ✅ Action marked completed by NGO
+                        {% if report.proof_location %} — Proof location: {{ report.proof_location }}{% endif %}
+                    </div>
+                    {% elif report.status == "No Response" %}
+                    <div class="error-banner" style="margin-top:10px;">
+                        ⚠️ No NGO response yet. You may later escalate this if needed.
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function switchCommunityTab(tab, el) {
+    document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
+    document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('tab-active'); });
+    document.getElementById('community-tab-' + tab).classList.add('active');
+    el.classList.add('tab-active');
+}
+
+function captureDistressLocation() {
+    const banner = document.getElementById('distress-location-banner');
+    const locInput = document.getElementById('distress_location');
+    const latInput = document.getElementById('distress_geo_lat');
+    const lonInput = document.getElementById('distress_geo_lon');
+
+    if (!navigator.geolocation) {
+        banner.textContent = 'Geolocation not supported. Please enter location manually.';
+        return;
+    }
+
+    banner.textContent = '⏳ Capturing location...';
+
+    navigator.geolocation.getCurrentPosition(
+        function(pos) {
+            const lat = pos.coords.latitude;
+            const lon = pos.coords.longitude;
+
+            latInput.value = lat;
+            lonInput.value = lon;
+
+            banner.textContent = '📍 GPS captured (' + lat.toFixed(4) + ', ' + lon.toFixed(4) + ')';
+
+            if (!locInput.value) {
+                locInput.value = lat.toFixed(4) + ', ' + lon.toFixed(4);
+            }
+        },
+        function() {
+            banner.textContent = 'Could not fetch GPS. Please enter location manually.';
+        },
+        { timeout: 10000, maximumAge: 60000, enableHighAccuracy: false }
+    );
+}
+</script>
+{% endblock %}

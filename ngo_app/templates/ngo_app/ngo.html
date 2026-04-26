@@ -1,0 +1,888 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}NGO Climate Operations Center — WePet{% endblock %}
+
+{% block extra_css %}
+<style>
+.ngo-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 24px;
+}
+.ngo-tab {
+    padding: 10px 16px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(255,255,255,0.04);
+    color: #475569;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+.ngo-tab.active {
+    background: rgba(59,130,246,0.12);
+    color: #1d4ed8;
+    border-color: rgba(59,130,246,0.25);
+}
+
+.kpi-grid {
+    display:grid;
+    grid-template-columns:repeat(5,1fr);
+    gap:12px;
+    margin-bottom:24px;
+}
+@media (max-width: 1100px) {
+    .kpi-grid { grid-template-columns:repeat(2,1fr); }
+}
+
+.ngo-two-col {
+    display: grid;
+    grid-template-columns: minmax(340px, 420px) minmax(520px, 700px);
+    gap: 24px;
+    margin-bottom: 24px;
+    align-items: start;
+    justify-content: start;   /* THIS is the key fix */
+    width: fit-content;       /* keeps both cards grouped together */
+    max-width: 100%;
+}
+
+@media (max-width: 1200px) {
+    .ngo-two-col {
+        grid-template-columns: 1fr;
+        width: 100%;
+    }
+}
+
+.ngo-card {
+    background: rgba(255,255,255,0.03);
+    border:1px solid rgba(255,255,255,0.08);
+    border-radius:16px;
+    padding:18px;
+    
+}
+
+@media (max-width: 1100px) {
+    .ngo-two-col {
+        grid-template-columns: 1fr;
+    }
+}
+
+.table-wrap {
+    overflow-x:auto;
+    margin-top:12px;
+}
+
+.data-table {
+    width:100%;
+    border-collapse:collapse;
+    min-width:900px;
+}
+
+.data-table th,
+.data-table td {
+    padding:12px 10px;
+    border-bottom:1px solid rgba(255,255,255,0.06);
+    text-align:left;
+    vertical-align:top;
+    font-size:0.9rem;
+}
+
+.data-table th {
+    color:#64748b;
+    font-size:0.78rem;
+    text-transform:uppercase;
+    letter-spacing:0.06em;
+}
+
+.risk-pill {
+    display:inline-block;
+    padding:5px 10px;
+    border-radius:999px;
+    font-size:0.76rem;
+    font-weight:700;
+    letter-spacing:0.03em;
+}
+
+.risk-low { background:rgba(34,197,94,0.12); color:#166534; }
+.risk-moderate { background:rgba(245,158,11,0.12); color:#92400e; }
+.risk-high { background:rgba(249,115,22,0.12); color:#9a3412; }
+.risk-critical { background:rgba(239,68,68,0.12); color:#991b1b; }
+
+.report-card {
+    border-left:4px solid #94a3b8;
+    background:rgba(255,255,255,0.03);
+    border-radius:14px;
+    padding:18px 20px;
+    margin-bottom:18px;
+    border:1px solid rgba(255,255,255,0.08);
+}
+.report-card.risk-low { border-left-color:#22c55e; }
+.report-card.risk-moderate { border-left-color:#f59e0b; }
+.report-card.risk-high { border-left-color:#f97316; }
+.report-card.risk-critical { border-left-color:#ef4444; }
+
+.status-chip {
+    display:inline-block;
+    padding:6px 10px;
+    border-radius:999px;
+    font-size:0.75rem;
+    font-weight:600;
+    border:1px solid rgba(255,255,255,0.08);
+}
+.status-no-response { background:rgba(100,116,139,0.12); color:#cbd5e1; }
+.status-acknowledged { background:rgba(59,130,246,0.12); color:#93c5fd; }
+.status-on-hold { background:rgba(245,158,11,0.12); color:#fcd34d; }
+.status-action-taken { background:rgba(34,197,94,0.12); color:#86efac; }
+
+.expand-panel {
+    display:none;
+    margin-top:14px;
+    padding-top:14px;
+    border-top:1px solid rgba(255,255,255,0.08);
+}
+.expand-panel.open { display:block; }
+
+.proof-block {
+    margin-top:12px;
+}
+.proof-block-hidden {
+    display:none;
+}
+.ngo-two-col {
+    display: grid;
+    grid-template-columns: minmax(340px, 390px) minmax(560px, 760px);
+    gap: 24px;
+    margin-bottom: 24px;
+    align-items: start;
+    justify-content: start;
+    width: fit-content;
+    max-width: 100%;
+}
+
+@media (max-width: 1200px) {
+    .ngo-two-col {
+        grid-template-columns: 1fr;
+        width: 100%;
+    }
+}
+
+.ngo-card {
+    background: rgba(255,255,255,0.03);
+    border:1px solid rgba(255,255,255,0.08);
+    border-radius:16px;
+    padding:18px;
+}
+
+.shelter-profile-card {
+    width: 100%;
+    max-width: 390px;
+    justify-self: start;
+}
+
+.shelter-profile-card .form-input,
+.shelter-profile-card .form-select,
+.shelter-profile-card .form-textarea {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.shelter-profile-card .btn {
+    width: auto;
+    max-width: 100%;
+    white-space: normal;
+}
+
+.add-animal-card {
+    width: 100%;
+    min-width: 560px;
+    max-width: 760px;
+}
+
+.registry-top-row {
+    margin-bottom: 24px;
+}
+
+/* FULL-WIDTH TABLE CARD */
+.registry-table-card {
+    width: 100%;
+    max-width: 100%;
+    display: block;
+    clear: both;
+}
+
+.registry-table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    margin-top: 12px;
+}
+
+.registry-data-table {
+    width: 100%;
+    min-width: 1100px;
+    border-collapse: collapse;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <p class="page-title">🏥 NGO Climate Operations Center</p>
+    <p class="page-subtitle">
+        Monitor shelter-wide climate risk, prioritise vulnerable groups, and respond to community distress alerts.
+    </p>
+</div>
+
+{% if error %}
+<div class="error-banner">❌ {{ error }}</div>
+{% endif %}
+{% if success %}
+<div class="success-banner">✅ {{ success }}</div>
+{% endif %}
+
+<div class="ngo-tabs">
+    <a href="{% url 'ngo:ngo' %}?tab=dashboard" class="ngo-tab {% if active_tab == 'dashboard' %}active{% endif %}">📊 Dashboard</a>
+    <a href="{% url 'ngo:ngo' %}?tab=registry" class="ngo-tab {% if active_tab == 'registry' %}active{% endif %}">🐾 Registry</a>
+    <a href="{% url 'ngo:ngo' %}?tab=monitor" class="ngo-tab {% if active_tab == 'monitor' %}active{% endif %}">🌡️ Live Risk Monitor</a>
+    <a href="{% url 'ngo:ngo' %}?tab=tickets" class="ngo-tab {% if active_tab == 'tickets' %}active{% endif %}">🚨 Distress Tickets</a>
+</div>
+
+{% if active_tab == 'dashboard' %}
+    <div class="kpi-grid">
+        <div class="metric-card">
+            <div class="metric-value">{{ total_groups }}</div>
+            <div class="metric-label">Animal Groups</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value">{{ total_animals }}</div>
+            <div class="metric-label">Total Animals</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value">{{ critical_groups }}</div>
+            <div class="metric-label">Critical Groups</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value">{{ high_groups }}</div>
+            <div class="metric-label">High Risk Groups</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value">{{ pending_reports }}</div>
+            <div class="metric-label">Pending Tickets</div>
+        </div>
+    </div>
+
+    <div class="ngo-two-col">
+        <div class="ngo-card">
+            <div class="section-label">🌤️ Shelter Climate</div>
+
+            {% if shelter.location_label %}
+                <div class="info-banner" style="margin-bottom:14px;">
+                    📍 {{ shelter.shelter_name }} — {{ shelter.location_label }}
+                </div>
+
+                {% if weather_error %}
+                    <div class="error-banner">❌ Could not fetch weather: {{ weather_error }}</div>
+                {% elif weather_data %}
+                    <div class="table-wrap">
+                        <table class="data-table" style="min-width:unset;">
+                            <tbody>
+                                <tr>
+                                    <td><strong>Temperature</strong></td>
+                                    <td>{{ weather_data.current.temperature }}°C</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Feels Like</strong></td>
+                                    <td>{{ weather_data.current.apparent_temperature }}°C</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Humidity</strong></td>
+                                    <td>{{ weather_data.current.humidity }}%</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>UV Index</strong></td>
+                                    <td>{{ weather_data.current.uv_index }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Wind</strong></td>
+                                    <td>{{ weather_data.current.wind_speed }} km/h</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Climate Level</strong></td>
+                                    <td>
+                                        <span class="risk-pill risk-{{ climate_summary.level|lower }}">
+                                            {{ climate_summary.level }} ({{ climate_summary.score|floatformat:1 }}/100)
+                                        </span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                {% endif %}
+            {% else %}
+                <div class="info-banner">
+                    ℹ️ Set your shelter location in <strong>Registry</strong> to enable live climate monitoring.
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="ngo-card">
+            <div class="section-label">⚡ Priority Queue</div>
+
+            {% if monitor_rows %}
+                {% for row in monitor_rows|slice:":5" %}
+                    <div style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.06);">
+                        <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;">
+                            <div>
+                                <strong>{{ row.group.breed_name }}</strong> × {{ row.group.count }}
+                                {% if row.group.zone %}<span style="color:#64748b;">— {{ row.group.zone }}</span>{% endif %}
+                            </div>
+                            <span class="risk-pill risk-{{ row.risk_level|lower }}">{{ row.risk_level }}</span>
+                        </div>
+                        <div style="font-size:0.82rem;color:#64748b;margin-top:4px;">
+                            {{ row.reason }}
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="info-banner">
+                    ℹ️ Add animal groups and set shelter location to generate a live priority queue.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+{% elif active_tab == 'registry' %}
+    <!-- TOP ROW: Shelter Profile + Add Animal Group -->
+    <div class="ngo-two-col registry-top-row">
+        <div class="ngo-card shelter-profile-card">
+            <div class="section-label">🏠 Shelter Profile & Location</div>
+
+            <form method="post" action="{% url 'ngo:save_location' %}">
+                {% csrf_token %}
+
+                <div class="form-group">
+                    <label class="form-label">Shelter Name</label>
+                    {{ shelter_form.shelter_name }}
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Shelter Location</label>
+                    {{ shelter_form.location_label }}
+                    {{ shelter_form.geo_lat }}
+                    {{ shelter_form.geo_lon }}
+                </div>
+
+                <div class="form-group">
+                    <button type="button" id="ngo-get-location-btn" class="btn btn-secondary" onclick="requestNgoLocation()">
+                        📍 Get Shelter Location
+                    </button>
+                    <button type="button" id="ngo-refresh-location-btn" class="btn btn-secondary" style="display:none;" onclick="refreshNgoLocation()">
+                        🔄 Refresh Location
+                    </button>
+                </div>
+
+                <div id="ngo-gps-info-banner" class="info-banner" style="display:none;"></div>
+                <div id="ngo-gps-success-banner" class="success-banner" style="display:none;"></div>
+                <div id="ngo-gps-error-banner" class="error-banner" style="display:none;"></div>
+
+                <button type="submit" class="btn btn-primary">💾 Save Shelter Profile</button>
+            </form>
+        </div>
+
+        <div class="ngo-card add-animal-card">
+            <div class="section-label">➕ Add Animal Group</div>
+
+            <div class="info-banner" style="margin-bottom:14px;">
+                ℹ️ If you don’t know the breed, upload a photo and WePet will try to identify it from the supported 37 trained classes.
+            </div>
+
+            <!-- Breed Detection Assist -->
+            <div class="form-group">
+                <label class="form-label">Detect Breed from Image (Optional)</label>
+                <input type="file"
+                    class="form-file"
+                    id="ngo_pet_image"
+                    accept=".jpg,.jpeg,.png"
+                    onchange="handleNgoImageUpload(this)">
+            </div>
+
+            <div id="ngo-detect-spinner" class="info-banner" style="display:none; margin-bottom:12px;">
+                ⏳ Detecting breed from uploaded image…
+            </div>
+
+            <div id="ngo-detect-result-banner" style="display:none; margin-bottom:12px;"></div>
+
+            <form method="post" action="{% url 'ngo:add_group' %}">
+                {% csrf_token %}
+
+                <!-- Hidden detection fields -->
+                <input type="hidden" name="detected_species" id="ngo_detected_species">
+                <input type="hidden" name="detected_breed" id="ngo_detected_breed">
+
+                <div id="ngo-fallback-section" style="display:none;">
+                    <div class="info-banner" style="margin-bottom:12px;">
+                        ℹ️ Please confirm or manually choose the closest supported breed below.
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Species</label>
+                    {{ group_form.species }}
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Breed</label>
+                    {{ group_form.breed_name }}
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Count</label>
+                    {{ group_form.count }}
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Zone / Kennel / Ward</label>
+                    {{ group_form.zone }}
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Notes</label>
+                    {{ group_form.notes }}
+                </div>
+
+                <button type="submit" class="btn btn-primary">🐾 Add Group</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- BOTTOM ROW: FULL WIDTH TABLE -->
+    <div class="ngo-card registry-table-card">
+        <div class="section-label">📚 Current Animal Registry</div>
+
+        {% if groups %}
+            <div class="table-wrap registry-table-wrap">
+                <table class="data-table registry-data-table">
+                    <thead>
+                        <tr>
+                            <th>Species</th>
+                            <th>Breed</th>
+                            <th>Count</th>
+                            <th>Zone</th>
+                            <th>Notes</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for group in groups %}
+                        <tr>
+                            <td>{{ group.species }}</td>
+                            <td>{{ group.breed_name }}</td>
+                            <td>{{ group.count }}</td>
+                            <td>{{ group.zone|default:"—" }}</td>
+                            <td>{{ group.notes|default:"—" }}</td>
+                            <td>
+                                <form method="post" action="{% url 'ngo:delete_group' group.id %}" style="display:inline;">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-secondary btn-sm">🗑 Remove</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="info-banner">
+                ℹ️ No animal groups added yet. Start with your most vulnerable breeds first.
+            </div>
+        {% endif %}
+    </div>
+
+{% elif active_tab == 'monitor' %}
+    <div class="ngo-card">
+        <div class="section-label">🌡️ Live Risk Monitor</div>
+
+        {% if not shelter.location_label %}
+            <div class="info-banner">
+                ℹ️ Please set your shelter location in <strong>Registry</strong> first.
+            </div>
+        {% elif weather_error %}
+            <div class="error-banner">❌ Could not fetch weather: {{ weather_error }}</div>
+        {% elif not monitor_rows %}
+            <div class="info-banner">
+                ℹ️ Add animal groups in <strong>Registry</strong> to start live monitoring.
+            </div>
+        {% else %}
+            <div class="table-wrap">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Species</th>
+                            <th>Breed</th>
+                            <th>Count</th>
+                            <th>Zone</th>
+                            <th>Risk</th>
+                            <th>Score</th>
+                            <th>Reason</th>
+                            <th>Recommendations</th>
+                            <th>Watch Signs</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in monitor_rows %}
+                        <tr>
+                            <td>{{ row.group.species }}</td>
+                            <td>{{ row.group.breed_name }}</td>
+                            <td>{{ row.group.count }}</td>
+                            <td>{{ row.group.zone|default:"—" }}</td>
+                            <td>
+                                <span class="risk-pill risk-{{ row.risk_level|lower }}">{{ row.risk_level }}</span>
+                            </td>
+                            <td>{{ row.risk_score }}</td>
+                            <td>{{ row.reason }}</td>
+                            <td>
+                                {% for rec in row.recommendations %}
+                                    • {{ rec }}<br>
+                                {% endfor %}
+                            </td>
+                            <td>
+                                {% for sign in row.watch_signs %}
+                                    • {{ sign }}<br>
+                                {% endfor %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+    </div>
+
+{% elif active_tab == 'tickets' %}
+    <div class="ngo-card">
+        <div class="section-label">📋 Distress Ticket Overview</div>
+        <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr);">
+            {% for status, count in status_counts.items %}
+            <div class="metric-card">
+                <div class="metric-value">{{ count }}</div>
+                <div class="metric-label">{{ status }}</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    {% if not reports %}
+        <div class="info-banner">ℹ️ No distress tickets submitted yet.</div>
+    {% endif %}
+
+    {% for report in reports %}
+    <div class="report-card risk-{{ report.severity_level|lower }}">
+        <div style="display:flex;justify-content:space-between;align-items:start;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
+            <div>
+                <div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:0.08em;color:#64748b;font-weight:600;">
+                    {{ report.report_id }}
+                </div>
+                <div style="font-size:0.8rem;color:#94a3b8;">
+                    Submitted: {{ report.submitted_at|slice:":16" }}
+                </div>
+            </div>
+
+            {% with s=report.status %}
+            <span class="status-chip
+                {% if s == 'Acknowledged' %}status-acknowledged
+                {% elif s == 'On Hold' %}status-on-hold
+                {% elif s == 'Action Taken' %}status-action-taken
+                {% else %}status-no-response{% endif %}">
+                {{ s }}
+            </span>
+            {% endwith %}
+        </div>
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+            <span class="info-chip">📍 {{ report.location }}</span>
+            <span class="info-chip">🐾 {{ report.animal_type|title }}</span>
+            <span class="info-chip">Severity: {{ report.severity_level }}</span>
+            <span class="info-chip">Score: {{ report.severity_score }}/100</span>
+        </div>
+
+        <div style="font-size:0.82rem;color:#94a3b8;margin-bottom:6px;">
+            <strong style="color:#64748b;">Reporter:</strong> {{ report.reporter_display_name }}
+        </div>
+
+        <div style="font-size:0.82rem;color:#94a3b8;margin-bottom:6px;">
+            <strong style="color:#64748b;">Urgency:</strong> {{ report.urgency }}
+        </div>
+
+        <button type="button" class="btn btn-secondary btn-sm" onclick="toggleTicketDetails('{{ report.report_id }}')">
+            🔍 Expand Ticket
+        </button>
+
+        <div id="ticket-{{ report.report_id }}" class="expand-panel">
+            <div style="font-size:0.82rem;color:#94a3b8;margin-bottom:8px;">
+                <strong style="color:#64748b;">Symptoms:</strong>
+                {{ report.symptoms|join:", "|default:"None selected" }}
+            </div>
+
+            {% if report.notes %}
+            <div style="font-size:0.82rem;color:#94a3b8;margin-bottom:8px;">
+                <strong style="color:#64748b;">Notes:</strong> {{ report.notes }}
+            </div>
+            {% endif %}
+
+            {% if report.reporter_image_name %}
+            <div style="font-size:0.82rem;color:#94a3b8;margin-bottom:8px;">
+                <strong style="color:#64748b;">Reporter Photo:</strong> {{ report.reporter_image_name }}
+            </div>
+            {% endif %}
+
+            {% if report.geo_lat or report.geo_lon %}
+            <div style="font-size:0.82rem;color:#94a3b8;margin-bottom:8px;">
+                <strong style="color:#64748b;">Geo:</strong> {{ report.geo_lat }}, {{ report.geo_lon }}
+            </div>
+            {% endif %}
+
+            {% if report.ngo_note %}
+            <div style="font-size:0.82rem;color:#94a3b8;margin-bottom:8px;">
+                <strong style="color:#64748b;">Current NGO Note:</strong> {{ report.ngo_note }}
+            </div>
+            {% endif %}
+
+            {% if report.proof_image_name %}
+            <div style="font-size:0.82rem;color:#94a3b8;margin-bottom:8px;">
+                <strong style="color:#64748b;">Proof Photo:</strong> {{ report.proof_image_name }}
+            </div>
+            {% endif %}
+
+            {% if report.proof_location %}
+            <div style="font-size:0.82rem;color:#94a3b8;margin-bottom:12px;">
+                <strong style="color:#64748b;">Proof Location:</strong> {{ report.proof_location }}
+            </div>
+            {% endif %}
+
+            <form method="post" action="{% url 'ngo:update_report' report.report_id %}" enctype="multipart/form-data">
+                {% csrf_token %}
+
+                <div class="form-group">
+                    <label class="form-label">Update Status</label>
+                    <select class="form-select" name="status" onchange="toggleActionProof(this, '{{ report.report_id }}')">
+                        <option value="No Response" {% if report.status == 'No Response' %}selected{% endif %}>No Response</option>
+                        <option value="Acknowledged" {% if report.status == 'Acknowledged' %}selected{% endif %}>Acknowledged</option>
+                        <option value="On Hold" {% if report.status == 'On Hold' %}selected{% endif %}>On Hold</option>
+                        <option value="Action Taken" {% if report.status == 'Action Taken' %}selected{% endif %}>Action Taken</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">NGO Note</label>
+                    <textarea class="form-textarea" name="ngo_note" rows="3"
+                              placeholder="e.g. Team dispatched. Vet contacted. Area visit scheduled...">{{ report.ngo_note }}</textarea>
+                </div>
+
+                <div id="proof-block-{{ report.report_id }}" class="proof-block {% if report.status != 'Action Taken' %}proof-block-hidden{% endif %}">
+                    <div class="form-group">
+                        <label class="form-label">Proof Photo (required for Action Taken)</label>
+                        <input type="file" class="form-file" name="proof_photo" accept=".jpg,.jpeg,.png">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Proof Location (required)</label>
+                        <input class="form-input" type="text" name="proof_location"
+                               value="{{ report.proof_location|default:'' }}"
+                               placeholder="e.g. Same spot / shifted to shelter / clinic location">
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary">
+                    💾 Update Ticket
+                </button>
+            </form>
+        </div>
+    </div>
+    {% endfor %}
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+
+{{ dog_breeds_js|json_script:"ngo-dog-breeds-data" }}
+{{ cat_breeds_js|json_script:"ngo-cat-breeds-data" }}
+
+<script>
+const NGO_DOG_BREEDS = JSON.parse(
+    document.getElementById('ngo-dog-breeds-data').textContent
+);
+const NGO_CAT_BREEDS = JSON.parse(
+    document.getElementById('ngo-cat-breeds-data').textContent
+);
+</script>
+
+<script src="{% static 'js/ngo_breed_detect.js' %}"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const speciesSel = document.getElementById('id_species');
+    if (speciesSel) {
+        speciesSel.addEventListener('change', function () {
+            handleNgoSpeciesChange(this.value);
+        });
+
+        if (speciesSel.value) {
+            handleNgoSpeciesChange(speciesSel.value);
+        }
+    }
+});
+
+function toggleTicketDetails(reportId) {
+    const panel = document.getElementById('ticket-' + reportId);
+    if (panel) panel.classList.toggle('open');
+}
+
+function toggleActionProof(selectEl, reportId) {
+    const block = document.getElementById('proof-block-' + reportId);
+    if (!block) return;
+    block.style.display = (selectEl.value === 'Action Taken') ? '' : 'none';
+}
+
+// NGO-specific location helpers
+function requestNgoLocation() {
+    if (!navigator.geolocation) {
+        showNgoGpsError('Browser geolocation is not supported.');
+        return;
+    }
+
+    const getBtn = document.getElementById('ngo-get-location-btn');
+    const refreshBtn = document.getElementById('ngo-refresh-location-btn');
+
+    if (getBtn) {
+        getBtn.disabled = true;
+        getBtn.textContent = '⏳ Locating…';
+    }
+
+    hideNgoGpsBanners();
+    showNgoGpsInfo('⏳ Requesting shelter GPS location…');
+
+    navigator.geolocation.getCurrentPosition(
+        function(position) {
+            const lat = position.coords.latitude;
+            const lon = position.coords.longitude;
+
+            const latEl = document.getElementById('id_geo_lat');
+            const lonEl = document.getElementById('id_geo_lon');
+            const labelEl = document.getElementById('id_location_label');
+
+            if (latEl) latEl.value = lat;
+            if (lonEl) lonEl.value = lon;
+
+            showNgoGpsSuccess('📍 Location captured: ' + lat.toFixed(4) + ', ' + lon.toFixed(4));
+
+            if (getBtn) {
+                getBtn.style.display = 'none';
+                getBtn.disabled = false;
+                getBtn.textContent = '📍 Get Shelter Location';
+            }
+            if (refreshBtn) refreshBtn.style.display = '';
+
+            reverseGeocodeNgo(lat, lon, function(label) {
+                if (labelEl) labelEl.value = label;
+                showNgoGpsSuccess('📍 Shelter location: ' + label);
+            });
+        },
+        function(err) {
+            let msg = 'Could not get location.';
+            switch (err.code) {
+                case err.PERMISSION_DENIED:
+                    msg = 'Location access denied.';
+                    break;
+                case err.POSITION_UNAVAILABLE:
+                    msg = 'Location unavailable.';
+                    break;
+                case err.TIMEOUT:
+                    msg = 'Location request timed out.';
+                    break;
+            }
+            showNgoGpsError(msg);
+
+            if (getBtn) {
+                getBtn.disabled = false;
+                getBtn.textContent = '📍 Get Shelter Location';
+            }
+        },
+        { timeout: 10000, maximumAge: 300000, enableHighAccuracy: false }
+    );
+}
+
+function refreshNgoLocation() {
+    const latEl = document.getElementById('id_geo_lat');
+    const lonEl = document.getElementById('id_geo_lon');
+    const labelEl = document.getElementById('id_location_label');
+
+    if (latEl) latEl.value = '';
+    if (lonEl) lonEl.value = '';
+    if (labelEl) labelEl.value = '';
+
+    const getBtn = document.getElementById('ngo-get-location-btn');
+    const refreshBtn = document.getElementById('ngo-refresh-location-btn');
+
+    if (getBtn) getBtn.style.display = '';
+    if (refreshBtn) refreshBtn.style.display = 'none';
+
+    hideNgoGpsBanners();
+    requestNgoLocation();
+}
+
+function reverseGeocodeNgo(lat, lon, callback) {
+    const url = 'https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=' +
+                encodeURIComponent(lat) + '&lon=' + encodeURIComponent(lon) +
+                '&zoom=12&addressdetails=1';
+
+    fetch(url, { headers: { 'Accept': 'application/json' } })
+        .then(r => {
+            if (!r.ok) throw new Error('Reverse geocoding failed');
+            return r.json();
+        })
+        .then(data => {
+            const addr = data.address || {};
+            const parts = [];
+            const locality = addr.city || addr.town || addr.village || addr.suburb || addr.county;
+
+            if (locality) parts.push(locality);
+            if (addr.state && !parts.includes(addr.state)) parts.push(addr.state);
+            if (addr.country && !parts.includes(addr.country)) parts.push(addr.country);
+
+            const label = parts.length ? parts.join(', ') : (data.display_name || 'Current Location');
+            callback(label);
+        })
+        .catch(() => {
+            callback(Number(lat).toFixed(4) + ', ' + Number(lon).toFixed(4));
+        });
+}
+
+function showNgoGpsInfo(msg) {
+    hideNgoGpsBanners();
+    const el = document.getElementById('ngo-gps-info-banner');
+    if (el) { el.textContent = msg; el.style.display = ''; }
+}
+
+function showNgoGpsSuccess(msg) {
+    hideNgoGpsBanners();
+    const el = document.getElementById('ngo-gps-success-banner');
+    if (el) { el.textContent = msg; el.style.display = ''; }
+}
+
+function showNgoGpsError(msg) {
+    hideNgoGpsBanners();
+    const el = document.getElementById('ngo-gps-error-banner');
+    if (el) { el.textContent = '❌ ' + msg; el.style.display = ''; }
+}
+
+function hideNgoGpsBanners() {
+    ['ngo-gps-info-banner', 'ngo-gps-success-banner', 'ngo-gps-error-banner'].forEach(function(id) {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+    });
+}
+</script>
+
+{% endblock %}

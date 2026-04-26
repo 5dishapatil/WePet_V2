@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Login — WePet{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <p class="page-title">🔐 Welcome to WePet</p>
+    <p class="page-subtitle">Sign in to save pet profiles and get personalised climate risk insights.</p>
+</div>
+
+<div class="login-outer">
+    <div class="login-card">
+
+        <!-- Tab switcher -->
+        <div class="login-tabs">
+            <button
+                type="button"
+                class="tab-btn {% if mode != 'signup' %}tab-active{% endif %}"
+                onclick="switchTab('login', this)"
+            >
+                Login
+            </button>
+            <button
+                type="button"
+                class="tab-btn {% if mode == 'signup' %}tab-active{% endif %}"
+                onclick="switchTab('signup', this)"
+            >
+                Sign Up
+            </button>
+        </div>
+
+        {% if error %}
+        <div class="error-banner" style="margin-bottom:16px;">❌ {{ error }}</div>
+        {% endif %}
+
+        <!-- LOGIN FORM -->
+        <div id="login-form-section" {% if mode == 'signup' %}style="display:none"{% endif %}>
+            <form method="post" action="{% url 'accounts:login' %}">
+                {% csrf_token %}
+                <input type="hidden" name="mode" value="login">
+
+                <div class="form-group">
+                    <label class="form-label">Email</label>
+                    <input
+                        class="form-input"
+                        type="email"
+                        name="email"
+                        placeholder="your@email.com"
+                        autocomplete="email"
+                        value="{{ login_email|default:'' }}"
+                        required
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Password</label>
+                    <input
+                        class="form-input"
+                        type="password"
+                        name="password"
+                        placeholder="••••••••"
+                        autocomplete="current-password"
+                        required
+                    >
+                </div>
+
+                <button type="submit" class="btn btn-primary" style="width:100%; margin-top:8px;">
+                    🔓 Login
+                </button>
+            </form>
+        </div>
+
+        <!-- SIGNUP FORM -->
+        <div id="signup-form-section" {% if mode != 'signup' %}style="display:none"{% endif %}>
+            <form method="post" action="{% url 'accounts:login' %}">
+                {% csrf_token %}
+                <input type="hidden" name="mode" value="signup">
+
+                <div class="form-group">
+                    <label class="form-label">Full Name</label>
+                    <input
+                        class="form-input"
+                        type="text"
+                        name="full_name"
+                        placeholder="Jane Doe"
+                        autocomplete="name"
+                        value="{{ signup_name|default:'' }}"
+                        required
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Email</label>
+                    <input
+                        class="form-input"
+                        type="email"
+                        name="email"
+                        placeholder="your@email.com"
+                        autocomplete="email"
+                        value="{{ signup_email|default:'' }}"
+                        required
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Password</label>
+                    <input
+                        class="form-input"
+                        type="password"
+                        name="password"
+                        placeholder="Min. 6 characters"
+                        autocomplete="new-password"
+                        required
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Confirm Password</label>
+                    <input
+                        class="form-input"
+                        type="password"
+                        name="confirm_password"
+                        placeholder="Repeat password"
+                        autocomplete="new-password"
+                        required
+                    >
+                </div>
+
+                <button type="submit" class="btn btn-primary" style="width:100%; margin-top:8px;">
+                    ✨ Create Account
+                </button>
+            </form>
+        </div>
+
+        <div class="info-banner" style="margin-top:20px;">
+            ℹ️ After logging in, you'll be able to save pet profiles and reuse them without
+            re-entering breed details every time.
+        </div>
+    </div>
+</div>
+
+<script>
+function switchTab(tab, btn) {
+    const loginSection = document.getElementById('login-form-section');
+    const signupSection = document.getElementById('signup-form-section');
+
+    if (tab === 'login') {
+        loginSection.style.display = '';
+        signupSection.style.display = 'none';
+    } else {
+        loginSection.style.display = 'none';
+        signupSection.style.display = '';
+    }
+
+    document.querySelectorAll('.tab-btn').forEach(function(button) {
+        button.classList.remove('tab-active');
+    });
+
+    btn.classList.add('tab-active');
+}
+</script>
+{% endblock %}

@@ -1,0 +1,110 @@
+{
+  "tasks": {
+    "high_critical": [
+      {
+        "id": "t001",
+        "task": "Place a shaded water bowl for strays in your area",
+        "why": "With today's heat conditions, animals outdoors can dehydrate quickly. A shaded bowl stays cooler and more accessible.",
+        "effort": "1 minute",
+        "points": 10
+      },
+      {
+        "id": "t002",
+        "task": "Refill an existing outdoor water source for street animals",
+        "why": "Water evaporates and heats up faster on high-heat days. Refilling ensures cool hydration is available.",
+        "effort": "1 minute",
+        "points": 10
+      },
+      {
+        "id": "t003",
+        "task": "Move any visible animal water bowl out of direct sunlight",
+        "why": "Direct sun heats water significantly. Cool water encourages drinking and prevents further overheating.",
+        "effort": "30 seconds",
+        "points": 10
+      },
+      {
+        "id": "t004",
+        "task": "Keep a shallow tray of water for birds near shade",
+        "why": "Birds also suffer from heat stress and dehydration. Shallow water allows safe drinking and cooling.",
+        "effort": "2 minutes",
+        "points": 10
+      },
+      {
+        "id": "t005",
+        "task": "Report any collapsed or heavily panting stray animal you observe",
+        "why": "In critical heat, animals can deteriorate within minutes. Early reporting allows faster response.",
+        "effort": "1 minute",
+        "points": 15
+      },
+      {
+        "id": "t006",
+        "task": "Do not disturb resting strays in shaded areas \u00e2\u20ac\u201d let them rest",
+        "why": "Resting in shade is a survival behaviour in heat. Disturbing them forces re-exertion in dangerous conditions.",
+        "effort": "0 minutes",
+        "points": 10
+      }
+    ],
+    "moderate": [
+      {
+        "id": "t007",
+        "task": "Refill your neighbourhood's animal water bowl if you pass one",
+        "why": "Moderate heat still requires consistent hydration access for outdoor animals.",
+        "effort": "1 minute",
+        "points": 10
+      },
+      {
+        "id": "t008",
+        "task": "Add a bird water tray to your balcony, garden, or terrace",
+        "why": "Bird populations benefit significantly from accessible water during warm months.",
+        "effort": "2 minutes",
+        "points": 10
+      },
+      {
+        "id": "t009",
+        "task": "Ensure any water bowl you have is in the shade, not sun",
+        "why": "Sun-exposed water heats quickly and becomes less beneficial or even discouraging to drink.",
+        "effort": "30 seconds",
+        "points": 10
+      }
+    ],
+    "low": [
+      {
+        "id": "t010",
+        "task": "Maintain and clean an existing outdoor water source",
+        "why": "Clean water prevents bacterial growth and keeps animals healthy even in lower risk conditions.",
+        "effort": "2 minutes",
+        "points": 10
+      },
+      {
+        "id": "t011",
+        "task": "Check if any outdoor water containers are empty and refill them",
+        "why": "Even on cooler days, outdoor animals need consistent hydration.",
+        "effort": "1 minute",
+        "points": 10
+      }
+    ]
+  },
+  "completion_log": [
+    {
+      "task_id": "t001",
+      "task": "Place a shaded water bowl for strays in your area",
+      "points": 10,
+      "location": "Chinchwad",
+      "completed_at": "2026-04-25T13:11:02.164059"
+    },
+    {
+      "task_id": "t007",
+      "task": "Refill your neighbourhood's animal water bowl if you pass one",
+      "points": 10,
+      "location": "karachi",
+      "completed_at": "2026-04-25T21:24:48.586886"
+    },
+    {
+      "task_id": "t003",
+      "task": "Move any visible animal water bowl out of direct sunlight",
+      "points": 10,
+      "location": "Chinchwad",
+      "completed_at": "2026-04-26T11:59:53.882836"
+    }
+  ]
+}

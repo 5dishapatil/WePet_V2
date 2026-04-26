@@ -1,0 +1,15 @@
+{
+  "images_dir": "E:\\Ideas\\images",
+  "num_classes": 37,
+  "total_images": 7390,
+  "train_size": 5172,
+  "val_size": 1109,
+  "test_size": 1109,
+  "best_val_accuracy": 0.8449053201082056,
+  "test_loss": 1.1945264245928462,
+  "top1_accuracy": 0.8539224526600541,
+  "top3_accuracy": 0.9556878308455149,
+  "precision": 0.8562435663102194,
+  "recall": 0.8539224526600541,
+  "f1_score": 0.853375794034039
+}
