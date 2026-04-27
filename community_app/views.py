@@ -6,6 +6,7 @@ FINAL FLOW:
 - Community users can submit distress reports
 - Community users can view their submitted alerts + NGO status
 - Community users can access Rewards page and claim simulated vouchers
+- Automatically fetches nearby animal shelters using OpenStreetMap
 """
 
 from datetime import timedelta
@@ -26,6 +27,7 @@ from core.services.weather_service import get_weather_for_location
 from core.services.risk_engine import compute_community_heat_score
 from core.services.citizen_task_engine import select_task, get_best_task_time
 from core.services.distress_service import submit_distress_report, get_reports_for_user
+from core.services.osm_service import fetch_nearby_shelters  # <-- NEW IMPORT
 
 from community_app.models import TaskCompletion, RewardClaim
 
@@ -223,6 +225,9 @@ def fetch_task_view(request):
     current_hour = timezone.localtime().hour
     best_time = get_best_task_time(current_hour)
 
+    # --- NEW: Fetch Nearby Shelters ---
+    shelters_data = fetch_nearby_shelters(location)
+
     request.session["comm_data"] = {
         "current": current,
         "location_display": weather_data["location"]["display"],
@@ -232,9 +237,11 @@ def fetch_task_view(request):
         "best_time": best_time,
         "location_raw": location,
         "completed": False,
+        "shelters": shelters_data, # Inject shelters into the session for the UI
     }
 
     return redirect("community:community")
+
 
 def _extract_gps_from_image(image_file):
     """Bulletproof EXIF reader that handles Apple/Android fraction formats."""
@@ -285,6 +292,7 @@ def _extract_gps_from_image(image_file):
     except Exception as e:
         print(f"DEBUG: Image parsing crashed -> {str(e)}")
         return None
+
 
 def _verify_location_with_osm(lat: float, lon: float, expected_city: str) -> bool:
     url = "https://nominatim.openstreetmap.org/reverse"
