@@ -1,5 +1,5 @@
 Django==4.2.30
-mysqlclient==2.2.8
+psycopg2-binary
 numpy==2.4.3
 pillow==12.1.1
 requests==2.33.1
