@@ -12,5 +12,3 @@ db.sqlite3
 .vscode/
 .idea/
 
-model.pth
-*.pth
