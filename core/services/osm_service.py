@@ -5,6 +5,19 @@ Fetches nearby animal shelters and veterinary clinics by city name.
 import re
 import requests
 
+# List of public Overpass API endpoints to use as fallbacks if one times out
+OVERPASS_ENDPOINTS = [
+    "https://overpass-api.de/api/interpreter",                # Main
+    "https://overpass.kumi.systems/api/interpreter",          # Fallback 1
+    "https://maps.mail.ru/osm/tools/overpass/api/interpreter" # Fallback 2
+]
+
+GEOCODING_URL = "https://nominatim.openstreetmap.org/search"
+
+HEADERS = {
+    "User-Agent": "WePetMVP/1.0 mytimetoshine2024@gmail.com"
+}
+
 
 def clean_text(value: str) -> str:
     """Strip HTML tags from a string and collapse leftover whitespace."""
@@ -12,14 +25,6 @@ def clean_text(value: str) -> str:
         return value
     no_tags = re.sub(r"<[^>]+>", "", value)
     return " ".join(no_tags.split()).strip()
-
-OVERPASS_URL = "https://overpass-api.de/api/interpreter"
-
-GEOCODING_URL = "https://nominatim.openstreetmap.org/search"
-
-HEADERS = {
-    "User-Agent": "WePetMVP/1.0 mytimetoshine2024@gmail.com"
-}
 
 
 def _geocode_city(city: str) -> tuple[float, float] | None:
@@ -108,21 +113,38 @@ def fetch_nearby_shelters(city: str) -> dict:
         return {"results": [], "error": f"Could not locate '{city}'. Try a more specific city name.", "count": 0}
 
     lat, lon = coords
+    query = _build_query(lat, lon)
+    data = None
 
-    try:
-        query = _build_query(lat, lon)
-        resp = requests.post(
-            OVERPASS_URL,
-            data={"data": query},
-            headers=HEADERS,
-            timeout=25,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-    except requests.Timeout:
-        return {"results": [], "error": "Request timed out. Please try again.", "count": 0}
-    except Exception as e:
-        return {"results": [], "error": f"Unable to fetch shelter data: {str(e)}", "count": 0}
+    # Loop through fallback servers if one goes down or times out
+    for endpoint in OVERPASS_ENDPOINTS:
+        try:
+            resp = requests.post(
+                endpoint,
+                data={"data": query},
+                headers=HEADERS,
+                timeout=25,
+            )
+            
+            if resp.status_code == 200:
+                data = resp.json()
+                break  # Success! Break out of the fallback loop
+                
+            elif resp.status_code in [429, 500, 502, 503, 504]:
+                # Server is overloaded or timing out. Move to the next fallback.
+                continue
+                
+        except (requests.Timeout, requests.RequestException):
+            # Connection dropped entirely. Move to the next fallback.
+            continue
+
+    # If the loop finishes and ALL endpoints failed
+    if not data:
+        return {
+            "results": [], 
+            "error": "The public map servers are currently overloaded. Please try again in a few minutes.", 
+            "count": 0
+        }
 
     elements = data.get("elements", [])
     if not elements:
