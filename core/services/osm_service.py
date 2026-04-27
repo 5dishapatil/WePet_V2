@@ -18,7 +18,7 @@ OVERPASS_URL = "https://overpass-api.de/api/interpreter"
 GEOCODING_URL = "https://nominatim.openstreetmap.org/search"
 
 HEADERS = {
-    "User-Agent": "WePetMVP/1.0 (climate risk app for pets)"
+    "User-Agent": "WePetMVP/1.0 mytimetoshine2024@gmail.com"
 }
 
 
