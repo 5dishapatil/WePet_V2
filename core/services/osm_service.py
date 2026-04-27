@@ -28,22 +28,47 @@ def clean_text(value: str) -> str:
 
 
 def _geocode_city(city: str) -> tuple[float, float] | None:
-    """Resolve city name to lat/lon using Nominatim."""
+    """
+    Resolve city name to lat/lon.
+    Uses Open-Meteo first (Cloud-friendly) and falls back to Nominatim.
+    """
+    city = city.strip()
+    
+    # --- Primary: Open-Meteo (Very reliable on Render/Cloud servers) ---
     try:
         resp = requests.get(
-            GEOCODING_URL,
+            "https://geocoding-api.open-meteo.com/v1/search",
+            params={"name": city, "count": 1, "format": "json"},
+            timeout=8
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+            if "results" in data and len(data["results"]) > 0:
+                # Open-Meteo uses 'latitude' and 'longitude' keys
+                r = data["results"][0]
+                return float(r["latitude"]), float(r["longitude"])
+    except Exception as e:
+        print(f"DEBUG: Open-Meteo geocoding failed -> {e}")
+        pass # If it fails, fall through to the fallback
+
+    # --- Fallback: Nominatim (Original OpenStreetMap Geocoder) ---
+    try:
+        resp = requests.get(
+            "https://nominatim.openstreetmap.org/search",
             params={"q": city, "format": "json", "limit": 1},
             headers=HEADERS,
             timeout=8,
         )
-        resp.raise_for_status()
-        results = resp.json()
-        if not results:
-            return None
-        r = results[0]
-        return float(r["lat"]), float(r["lon"])
-    except Exception:
-        return None
+        if resp.status_code == 200:
+            results = resp.json()
+            if results:
+                return float(results[0]["lat"]), float(results[0]["lon"])
+    except Exception as e:
+        print(f"DEBUG: Nominatim geocoding failed -> {e}")
+        pass
+
+    # If both APIs fail to find the city or block the IP, return None
+    return None
 
 
 def _build_query(lat: float, lon: float, radius_m: int = 15000) -> str:
