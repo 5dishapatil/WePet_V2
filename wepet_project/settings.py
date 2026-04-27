@@ -10,8 +10,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # ─── Security ────────────────────────────────────────────────────────────────
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "django-insecure-wepet-mvp-change-this-in-production-xyz1234567890")
-DEBUG = os.getenv("DJANGO_DEBUG", "True") == "True"
-ALLOWED_HOSTS = ["*"]
+DEBUG = os.getenv("DJANGO_DEBUG", "False") == "True"
+ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "127.0.0.1,localhost,.onrender.com").split(",")
 
 # ─── Applications ─────────────────────────────────────────────────────────────
 INSTALLED_APPS = [
@@ -31,6 +31,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -95,9 +96,19 @@ USE_TZ = True
 
 # ─── Static & Media ───────────────────────────────────────────────────────────
 STATIC_URL = "/static/"
-CORE_STATIC_DIR = BASE_DIR / "core" / "static"
-STATICFILES_DIRS = [CORE_STATIC_DIR] if CORE_STATIC_DIR.exists() else []
 STATIC_ROOT = BASE_DIR / "staticfiles"
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+
+STATICFILES_DIRS = []
+
+PROJECT_STATIC_DIR = BASE_DIR / "static"
+CORE_STATIC_DIR = BASE_DIR / "core" / "static"
+
+if PROJECT_STATIC_DIR.exists():
+    STATICFILES_DIRS.append(PROJECT_STATIC_DIR)
+
+if CORE_STATIC_DIR.exists():
+    STATICFILES_DIRS.append(CORE_STATIC_DIR)
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
