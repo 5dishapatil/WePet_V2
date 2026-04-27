@@ -63,7 +63,7 @@ WSGI_APPLICATION = "wepet_project.wsgi.application"
 # ─── Database (MySQL) ─────────────────────────────────────────────────────────
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.mysql",
+        "ENGINE": "django.db.backends.postgresql",
         "NAME": os.getenv("DB_NAME", "wepet"),
         "USER": os.getenv("DB_USER", "root"),
         "PASSWORD": os.getenv("DB_PASSWORD", "root"),
