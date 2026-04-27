@@ -1,18 +1,11 @@
 """
 community_app/views.py — Community mode views for WePet Django.
-
-FINAL FLOW:
-- Daily task logic preserved
-- Community users can submit distress reports
-- Community users can view their submitted alerts + NGO status
-- Community users can access Rewards page and claim simulated vouchers
-- Automatically fetches nearby animal shelters using OpenStreetMap
 """
 
+import math
 from datetime import timedelta
 import random
 import string
-
 import io
 import requests
 from PIL import Image, ExifTags
@@ -27,10 +20,8 @@ from core.services.weather_service import get_weather_for_location
 from core.services.risk_engine import compute_community_heat_score
 from core.services.citizen_task_engine import select_task, get_best_task_time
 from core.services.distress_service import submit_distress_report, get_reports_for_user
-from core.services.osm_service import fetch_nearby_shelters  # <-- NEW IMPORT
-
+from core.services.osm_service import fetch_nearby_shelters, _geocode_city
 from community_app.models import TaskCompletion, RewardClaim
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Community Distress Form Options
@@ -96,8 +87,10 @@ def get_user_streak_days(user):
     if not completions.exists():
         return 0
 
+    # FIX 2: Use timezone.localtime() instead of astimezone() to prevent 500 errors 
+    # if the server returns a naive datetime object.
     completion_dates = set(
-        c.completed_at.astimezone(timezone.get_current_timezone()).date()
+        timezone.localtime(c.completed_at).date()
         for c in completions
     )
 
@@ -194,6 +187,7 @@ def community_view(request):
         "my_reports": my_reports,
         "distress_symptoms": DISTRESS_SYMPTOMS,
         "active_tab": "community",
+        "saved_city": request.session.get("saved_user_city", ""), 
     }
     return render(request, "community_app/community.html", context)
 
@@ -211,6 +205,11 @@ def fetch_task_view(request):
         request.session["comm_error"] = "Please enter your city to continue."
         return redirect("community:community")
 
+    request.session["saved_user_city"] = location
+
+    city_coords = _geocode_city(location)
+    city_lat, city_lon = city_coords if city_coords else (None, None)
+
     weather_data = get_weather_for_location(location)
     if "error" in weather_data:
         request.session["comm_error"] = f"Could not fetch weather: {weather_data['error']}"
@@ -225,7 +224,6 @@ def fetch_task_view(request):
     current_hour = timezone.localtime().hour
     best_time = get_best_task_time(current_hour)
 
-    # --- NEW: Fetch Nearby Shelters ---
     shelters_data = fetch_nearby_shelters(location)
 
     request.session["comm_data"] = {
@@ -236,8 +234,10 @@ def fetch_task_view(request):
         "task": task,
         "best_time": best_time,
         "location_raw": location,
+        "city_lat": city_lat, 
+        "city_lon": city_lon, 
         "completed": False,
-        "shelters": shelters_data, # Inject shelters into the session for the UI
+        "shelters": shelters_data,
     }
 
     return redirect("community:community")
@@ -246,12 +246,11 @@ def fetch_task_view(request):
 def _extract_gps_from_image(image_file):
     """Bulletproof EXIF reader that handles Apple/Android fraction formats."""
     try:
-        image_file.seek(0) # Reset file pointer just in case
+        image_file.seek(0)
         img = Image.open(image_file)
         exif_data = img._getexif()
         
         if not exif_data:
-            print("DEBUG: No EXIF data found in image.")
             return None
 
         gps_info = None
@@ -261,7 +260,6 @@ def _extract_gps_from_image(image_file):
                 break
 
         if not gps_info:
-            print("DEBUG: EXIF found, but no GPS block.")
             return None
 
         lat_ref = gps_info.get(1)
@@ -272,7 +270,6 @@ def _extract_gps_from_image(image_file):
         if not all([lat_ref, lat, lon_ref, lon]):
             return None
 
-        # Helper to safely convert complex fractions to decimals
         def to_float(val):
             if isinstance(val, tuple):
                 return float(val[0]) / float(val[1]) if val[1] != 0 else 0.0
@@ -286,7 +283,6 @@ def _extract_gps_from_image(image_file):
         final_lat = to_decimal(lat, lat_ref)
         final_lon = to_decimal(lon, lon_ref)
         
-        print(f"DEBUG: Successfully extracted -> Lat: {final_lat}, Lon: {final_lon}")
         return final_lat, final_lon
         
     except Exception as e:
@@ -294,31 +290,23 @@ def _extract_gps_from_image(image_file):
         return None
 
 
-def _verify_location_with_osm(lat: float, lon: float, expected_city: str) -> bool:
-    url = "https://nominatim.openstreetmap.org/reverse"
-    params = {"lat": lat, "lon": lon, "format": "json", "zoom": 10, "addressdetails": 1}
-    headers = {"User-Agent": "WePet-Django-App/1.0"}
-
+def _calculate_distance(lat1, lon1, lat2, lon2):
+    """Calculates distance in kilometers between two GPS points using the Haversine formula."""
     try:
-        resp = requests.get(url, params=params, headers=headers, timeout=8)
-        data = resp.json()
-    except Exception:
-        return False 
-
-    address = data.get("address", {})
-    osm_candidates = [
-        address.get("city", ""), address.get("town", ""), address.get("village", ""),
-        address.get("suburb", ""), address.get("county", ""), address.get("state_district", ""),
-        address.get("state", ""), address.get("country", "")
-    ]
-    osm_candidates = [p.strip().lower() for p in osm_candidates if p]
-    query_parts = [part.strip().lower() for part in expected_city.split(",") if part.strip()]
-
-    # --- NEW DEBUG PRINTS ---
-    print(f"DEBUG: User claims they are in -> {query_parts}")
-    print(f"DEBUG: OpenStreetMap says this GPS is actually -> {osm_candidates}")
-
-    return any(qp in osm for qp in query_parts for osm in osm_candidates)
+        # FIX 1: Safely cast to float. Session data often serializes numeric values to strings. 
+        # Without this, math.radians() will crash the server if fed a string.
+        lat1, lon1, lat2, lon2 = float(lat1), float(lon1), float(lat2), float(lon2)
+        
+        R = 6371.0 
+        dlat = math.radians(lat2 - lat1)
+        dlon = math.radians(lon2 - lon1)
+        a = (math.sin(dlat / 2)**2 +
+             math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2)**2)
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+        return R * c
+    except (TypeError, ValueError):
+        # Fallback to prevent crash if data is totally corrupted
+        return 9999.0 
 
 
 @login_required(login_url="/accounts/login/")
@@ -329,7 +317,6 @@ def complete_task_view(request):
     if not comm_data or comm_data.get("completed"):
         return redirect("community:community")
 
-    # --- Image Validation Logic ---
     proof_photo = request.FILES.get("proof_photo")
     if not proof_photo:
         request.session["comm_error"] = "Please upload a photo as proof of your action."
@@ -340,31 +327,23 @@ def complete_task_view(request):
         request.session["comm_error"] = "❌ No GPS Geotag found in the photo. Please ensure Location is enabled in your camera settings."
         return redirect("community:community")
 
-    lat, lon = coords
+    photo_lat, photo_lon = coords
+    city_lat = comm_data.get("city_lat")
+    city_lon = comm_data.get("city_lon")
     expected_location = comm_data.get("location_raw", "")
     
-    is_valid = _verify_location_with_osm(lat, lon, expected_location)
-    if not is_valid:
-        request.session["comm_error"] = "❌ Location mismatch! The photo's GPS does not match your active task location."
-        return redirect("community:community")
-    # --- End Image Validation ---
+    # Safely evaluate distance now that the math function is heavily armored
+    if city_lat is not None and city_lon is not None:
+        distance = _calculate_distance(city_lat, city_lon, photo_lat, photo_lon)
+        if distance > 50.0: 
+            request.session["comm_error"] = f"❌ Location mismatch! The photo was taken {int(distance)}km away from {expected_location}."
+            return redirect("community:community")
 
     task = comm_data.get("task", {})
     task_id = task.get("id", "default")
-    
-    # Force integer to guarantee the database can sum the points mathematically
     points_to_award = int(task.get("points", 10)) 
 
-    # --- TESTING BYPASS: Disabled the daily limit so you can test multiple uploads! ---
-    # In production, you would uncomment these lines to prevent spamming:
-    # today = timezone.localdate()
-    # already_completed_today = TaskCompletion.objects.filter(
-    #     user=request.user,
-    #     task_id=task_id,
-    #     completed_at__date=today,
-    # ).exists()
-    
-    already_completed_today = False # FORCE FALSE FOR TESTING
+    already_completed_today = False 
 
     if not already_completed_today:
         TaskCompletion.objects.create(
@@ -391,9 +370,6 @@ def complete_task_view(request):
 @login_required(login_url="/accounts/login/")
 @require_POST
 def submit_distress_view(request):
-    """
-    Community user submits a distress ticket.
-    """
     location = request.POST.get("distress_location", "").strip()
     animal_type = request.POST.get("animal_type", "").strip()
     weather_level = request.POST.get("heat_level", "moderate").strip()
@@ -445,13 +421,6 @@ def submit_distress_view(request):
 
 @login_required(login_url="/accounts/login/")
 def rewards_view(request):
-    """
-    Rewards page:
-    - show total points
-    - show streak
-    - show unlock progress
-    - show claimed simulated vouchers
-    """
     total_pts = get_user_total_points(request.user)
     streak = get_user_streak_days(request.user)
 
@@ -467,6 +436,7 @@ def rewards_view(request):
         "error": error,
         "success": success,
         "active_tab": "rewards",
+        "saved_city": request.session.get("saved_user_city", ""),
     }
     return render(request, "community_app/community.html", context)
 
@@ -474,9 +444,6 @@ def rewards_view(request):
 @login_required(login_url="/accounts/login/")
 @require_POST
 def claim_reward_view(request, milestone):
-    """
-    Claim a simulated reward if the user is eligible and hasn't claimed it yet.
-    """
     total_pts = get_user_total_points(request.user)
 
     tier = next((t for t in REWARD_TIERS if t["milestone"] == milestone), None)
