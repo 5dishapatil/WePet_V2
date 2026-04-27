@@ -321,19 +321,17 @@ def complete_task_view(request):
     if not comm_data or comm_data.get("completed"):
         return redirect("community:community")
 
-    # --- NEW: Image Validation Logic ---
+    # --- Image Validation Logic ---
     proof_photo = request.FILES.get("proof_photo")
     if not proof_photo:
         request.session["comm_error"] = "Please upload a photo as proof of your action."
         return redirect("community:community")
 
-    # Check for GPS tags
     coords = _extract_gps_from_image(proof_photo)
     if not coords:
         request.session["comm_error"] = "❌ No GPS Geotag found in the photo. Please ensure Location is enabled in your camera settings."
         return redirect("community:community")
 
-    # Check if location matches
     lat, lon = coords
     expected_location = comm_data.get("location_raw", "")
     
@@ -345,23 +343,30 @@ def complete_task_view(request):
 
     task = comm_data.get("task", {})
     task_id = task.get("id", "default")
-    today = timezone.localdate()
+    
+    # Force integer to guarantee the database can sum the points mathematically
+    points_to_award = int(task.get("points", 10)) 
 
-    already_completed_today = TaskCompletion.objects.filter(
-        user=request.user,
-        task_id=task_id,
-        completed_at__date=today,
-    ).exists()
+    # --- TESTING BYPASS: Disabled the daily limit so you can test multiple uploads! ---
+    # In production, you would uncomment these lines to prevent spamming:
+    # today = timezone.localdate()
+    # already_completed_today = TaskCompletion.objects.filter(
+    #     user=request.user,
+    #     task_id=task_id,
+    #     completed_at__date=today,
+    # ).exists()
+    
+    already_completed_today = False # FORCE FALSE FOR TESTING
 
     if not already_completed_today:
         TaskCompletion.objects.create(
             user=request.user,
             task_id=task_id,
             task_text=task.get("task", ""),
-            points=task.get("points", 10),
+            points=points_to_award,
             location=expected_location,
         )
-        request.session["comm_success"] = f"Photo verified! You earned +{task.get('points', 10)} points 🎉"
+        request.session["comm_success"] = f"Photo verified! You earned +{points_to_award} points 🎉"
     else:
         request.session["comm_success"] = "You have already completed this task today."
 
