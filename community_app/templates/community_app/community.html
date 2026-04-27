@@ -386,11 +386,47 @@
                 </div>
                 {% endwith %}
 
-                {% if not comm_data.completed %}
-                <form method="post" action="{% url 'community:complete_task' %}">
+{% if not comm_data.completed %}
+                <form method="post" action="{% url 'community:complete_task' %}" enctype="multipart/form-data">
                     {% csrf_token %}
+                    
+<div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:16px; margin-bottom:16px;">
+                        <label class="form-label">📸 Photo Proof Required</label>
+                        <div style="font-size:0.8rem; color:#94a3b8; margin-bottom:16px; line-height: 1.5;">
+                            Upload a photo showing your action. <strong>Location (GPS) tags must be enabled on your camera.</strong>
+                        </div>
+                        
+                        <div style="display:flex; gap:20px; margin-bottom:14px; padding-bottom:14px; border-bottom:1px solid rgba(255,255,255,0.05);">
+                            <label style="cursor:pointer; display:flex; align-items:center; gap:8px; font-size:0.9rem; color:#e2e8f0; font-weight:500;">
+                                <input type="radio" name="upload_method" value="camera" checked onchange="toggleCameraMode()">
+                                📸 Camera
+                            </label>
+                            <label style="cursor:pointer; display:flex; align-items:center; gap:8px; font-size:0.9rem; color:#e2e8f0; font-weight:500;">
+                                <input type="radio" name="upload_method" value="gallery" onchange="toggleCameraMode()">
+                                🖼️ Gallery
+                            </label>
+                        </div>
+
+                        <div style="position: relative; overflow: hidden; border: 2px dashed #64748b; background: rgba(0,0,0,0.2); border-radius: 8px; text-align: center; height: 60px;">
+                            
+                            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none;">
+                                <span id="upload_btn_text" style="color: #e2e8f0; font-size: 1rem; font-weight: 500;">📸 Tap here to open Camera</span>
+                            </div>
+
+                            <input type="file" id="proof_photo_camera" name="proof_photo" accept="image/*" capture="environment" required 
+                                   style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; z-index: 10;" 
+                                   onchange="updateFileName(this)">
+
+                            <input type="file" id="proof_photo_gallery" name="proof_photo" accept="image/*" disabled 
+                                   style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; display: none; z-index: 10;" 
+                                   onchange="updateFileName(this)">
+                        </div>
+                        
+                        <div id="file_name_display" style="font-size:0.85rem; color:#4ade80; text-align:center; margin-top:12px; display:none; font-weight:600;"></div>
+                    </div>
+
                     <button type="submit" class="btn btn-primary" style="width:100%;">
-                        ✅ I completed this task!
+                        ✨ Verify & Mark as Complete
                     </button>
                 </form>
                 {% else %}
@@ -687,6 +723,45 @@ function switchCommunityTab(tab, el) {
     if (target) target.classList.add('active');
 
     if (el) el.classList.add('tab-active');
+}
+
+function toggleCameraMode() {
+    const mode = document.querySelector('input[name="upload_method"]:checked').value;
+    const camInput = document.getElementById('proof_photo_camera');
+    const galInput = document.getElementById('proof_photo_gallery');
+    const btnText = document.getElementById('upload_btn_text');
+    
+    camInput.value = "";
+    galInput.value = "";
+    document.getElementById('file_name_display').style.display = 'none';
+
+    if (mode === 'camera') {
+        camInput.disabled = false;
+        camInput.style.display = 'block';
+        
+        galInput.disabled = true;
+        galInput.style.display = 'none';
+        
+        btnText.innerHTML = '📸 Tap here to open Camera';
+    } else {
+        camInput.disabled = true;
+        camInput.style.display = 'none';
+        
+        galInput.disabled = false;
+        galInput.style.display = 'block';
+        
+        btnText.innerHTML = '🖼️ Tap here to open Gallery';
+    }
+}
+
+function updateFileName(input) {
+    const display = document.getElementById('file_name_display');
+    if (input.files && input.files.length > 0) {
+        display.style.display = 'block';
+        display.innerHTML = '✅ Image attached! Ready to verify.';
+    } else {
+        display.style.display = 'none';
+    }
 }
 
 function captureDistressLocation() {
