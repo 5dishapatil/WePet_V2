@@ -12,6 +12,10 @@ from datetime import timedelta
 import random
 import string
 
+import io
+import requests
+from PIL import Image, ExifTags
+
 from django.contrib.auth.decorators import login_required
 from django.db.models import Sum
 from django.shortcuts import render, redirect
@@ -232,6 +236,82 @@ def fetch_task_view(request):
 
     return redirect("community:community")
 
+def _extract_gps_from_image(image_file):
+    """Bulletproof EXIF reader that handles Apple/Android fraction formats."""
+    try:
+        image_file.seek(0) # Reset file pointer just in case
+        img = Image.open(image_file)
+        exif_data = img._getexif()
+        
+        if not exif_data:
+            print("DEBUG: No EXIF data found in image.")
+            return None
+
+        gps_info = None
+        for tag, value in exif_data.items():
+            if ExifTags.TAGS.get(tag, tag) == "GPSInfo":
+                gps_info = value
+                break
+
+        if not gps_info:
+            print("DEBUG: EXIF found, but no GPS block.")
+            return None
+
+        lat_ref = gps_info.get(1)
+        lat = gps_info.get(2)
+        lon_ref = gps_info.get(3)
+        lon = gps_info.get(4)
+
+        if not all([lat_ref, lat, lon_ref, lon]):
+            return None
+
+        # Helper to safely convert complex fractions to decimals
+        def to_float(val):
+            if isinstance(val, tuple):
+                return float(val[0]) / float(val[1]) if val[1] != 0 else 0.0
+            return float(val)
+
+        def to_decimal(dms, ref):
+            deg, min, sec = to_float(dms[0]), to_float(dms[1]) / 60.0, to_float(dms[2]) / 3600.0
+            val = round(deg + min + sec, 5)
+            return -val if ref in ['S', 'W'] else val
+
+        final_lat = to_decimal(lat, lat_ref)
+        final_lon = to_decimal(lon, lon_ref)
+        
+        print(f"DEBUG: Successfully extracted -> Lat: {final_lat}, Lon: {final_lon}")
+        return final_lat, final_lon
+        
+    except Exception as e:
+        print(f"DEBUG: Image parsing crashed -> {str(e)}")
+        return None
+
+def _verify_location_with_osm(lat: float, lon: float, expected_city: str) -> bool:
+    url = "https://nominatim.openstreetmap.org/reverse"
+    params = {"lat": lat, "lon": lon, "format": "json", "zoom": 10, "addressdetails": 1}
+    headers = {"User-Agent": "WePet-Django-App/1.0"}
+
+    try:
+        resp = requests.get(url, params=params, headers=headers, timeout=8)
+        data = resp.json()
+    except Exception:
+        return False 
+
+    address = data.get("address", {})
+    osm_candidates = [
+        address.get("city", ""), address.get("town", ""), address.get("village", ""),
+        address.get("suburb", ""), address.get("county", ""), address.get("state_district", ""),
+        address.get("state", ""), address.get("country", "")
+    ]
+    osm_candidates = [p.strip().lower() for p in osm_candidates if p]
+    query_parts = [part.strip().lower() for part in expected_city.split(",") if part.strip()]
+
+    # --- NEW DEBUG PRINTS ---
+    print(f"DEBUG: User claims they are in -> {query_parts}")
+    print(f"DEBUG: OpenStreetMap says this GPS is actually -> {osm_candidates}")
+
+    return any(qp in osm for qp in query_parts for osm in osm_candidates)
+
 
 @login_required(login_url="/accounts/login/")
 @require_POST
@@ -241,11 +321,32 @@ def complete_task_view(request):
     if not comm_data or comm_data.get("completed"):
         return redirect("community:community")
 
+    # --- NEW: Image Validation Logic ---
+    proof_photo = request.FILES.get("proof_photo")
+    if not proof_photo:
+        request.session["comm_error"] = "Please upload a photo as proof of your action."
+        return redirect("community:community")
+
+    # Check for GPS tags
+    coords = _extract_gps_from_image(proof_photo)
+    if not coords:
+        request.session["comm_error"] = "❌ No GPS Geotag found in the photo. Please ensure Location is enabled in your camera settings."
+        return redirect("community:community")
+
+    # Check if location matches
+    lat, lon = coords
+    expected_location = comm_data.get("location_raw", "")
+    
+    is_valid = _verify_location_with_osm(lat, lon, expected_location)
+    if not is_valid:
+        request.session["comm_error"] = "❌ Location mismatch! The photo's GPS does not match your active task location."
+        return redirect("community:community")
+    # --- End Image Validation ---
+
     task = comm_data.get("task", {})
     task_id = task.get("id", "default")
     today = timezone.localdate()
 
-    # Prevent duplicate completion of same task_id on same day
     already_completed_today = TaskCompletion.objects.filter(
         user=request.user,
         task_id=task_id,
@@ -258,15 +359,11 @@ def complete_task_view(request):
             task_id=task_id,
             task_text=task.get("task", ""),
             points=task.get("points", 10),
-            location=comm_data.get("location_raw", ""),
+            location=expected_location,
         )
-        request.session["comm_success"] = (
-            f"Task completed! You earned +{task.get('points', 10)} points 🎉"
-        )
+        request.session["comm_success"] = f"Photo verified! You earned +{task.get('points', 10)} points 🎉"
     else:
-        request.session["comm_success"] = (
-            "You have already completed this task today."
-        )
+        request.session["comm_success"] = "You have already completed this task today."
 
     comm_data["completed"] = True
     request.session["comm_data"] = comm_data
