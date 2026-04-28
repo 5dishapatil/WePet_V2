@@ -11,7 +11,6 @@ from core.services.breed_profile_service import get_breed_profile, get_dog_breed
 from core.services.risk_engine import compute_community_heat_score, compute_ngo_group_risk
 from core.services.distress_service import get_all_reports_sorted, update_report_status
 from core.services.breed_classifier_service import predict_from_bytes
-import json
 
 
 def _get_or_create_shelter(user):
@@ -262,6 +261,13 @@ def delete_group_view(request, group_id):
 def update_report_view(request, report_id):
     """
     NGO updates community-submitted distress ticket status.
+
+    FINAL LOGIC:
+    - NGO can upload proof image anytime
+    - No geotag / metadata checks
+    - If ANY proof image exists (new upload OR old saved one), then proof is considered found
+    - 'Action Taken' is allowed only if proof exists
+    - Proof location is OPTIONAL
     """
     status = request.POST.get("status", "").strip()
     ngo_note = request.POST.get("ngo_note", "").strip()
@@ -270,21 +276,46 @@ def update_report_view(request, report_id):
     proof_photo = request.FILES.get("proof_photo")
     proof_image_name = proof_photo.name if proof_photo else None
 
-    if status == "Action Taken":
-        if not proof_image_name:
-            request.session["ngo_error"] = "To mark Action Taken, you must upload a proof photo."
-            return redirect("/ngo/?tab=tickets")
-        if not proof_location:
-            request.session["ngo_error"] = "To mark Action Taken, you must enter the proof location."
-            return redirect("/ngo/?tab=tickets")
+    # Fetch existing report so we can preserve old proof and allow Action Taken
+    # even if the NGO uploaded proof earlier and is not re-uploading now.
+    existing_report = None
+    try:
+        reports = get_all_reports_sorted()
+        existing_report = next(
+            (r for r in reports if str(r.get("report_id")) == str(report_id)),
+            None
+        )
+    except Exception:
+        existing_report = None
+
+    existing_proof_image_name = None
+    existing_proof_location = ""
+
+    if existing_report:
+        existing_proof_image_name = existing_report.get("proof_image_name")
+        existing_proof_location = existing_report.get("proof_location", "") or ""
+
+    # If any image exists at all, proof is considered found
+    has_any_proof = bool(proof_image_name or existing_proof_image_name)
+
+    # Action Taken only allowed if proof exists
+    if status == "Action Taken" and not has_any_proof:
+        request.session["ngo_error"] = "To mark Action Taken, please upload a proof photo first."
+        return redirect("/ngo/?tab=tickets")
+
+    # Preserve old proof if no new file uploaded
+    final_proof_image_name = proof_image_name or existing_proof_image_name
+
+    # Proof location is optional; preserve old one if not re-entered
+    final_proof_location = proof_location or existing_proof_location
 
     ok = update_report_status(
         report_id=report_id,
         status=status,
         ngo_username=request.user.username,
         ngo_note=ngo_note,
-        proof_image_name=proof_image_name,
-        proof_location=proof_location,
+        proof_image_name=final_proof_image_name,
+        proof_location=final_proof_location,
     )
 
     if ok:
