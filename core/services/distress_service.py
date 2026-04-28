@@ -1,10 +1,16 @@
 """
 core/services/distress_service.py — Community distress ticket system for WePet MVP.
 
-NEW FLOW:
+FINAL FLOW:
 - Community users submit distress alerts
-- NGO users only view + update tickets
+- NGO users view + update tickets
 - Tickets persist in JSON for MVP compatibility
+
+UPDATED NGO ACTION LOGIC:
+- "Action Taken" requires proof to exist
+- Proof means: any non-empty proof_image_name
+- proof_location is OPTIONAL
+- Existing proof is preserved unless a new one is passed
 """
 
 from datetime import datetime
@@ -141,7 +147,7 @@ def submit_distress_report(
         "geo_lat": str(geo_lat).strip() if geo_lat else "",
         "geo_lon": str(geo_lon).strip() if geo_lon else "",
 
-        # evidence
+        # reporter evidence
         "reporter_image_name": image_name if image_name else None,
         "has_image": bool(image_name),
 
@@ -218,27 +224,25 @@ def update_report_status(
 ) -> bool:
     """
     Update ticket status.
+
     Allowed statuses:
     - No Response
     - Acknowledged
     - On Hold
     - Action Taken
 
-    If status == "Action Taken":
-    - proof_image_name REQUIRED
-    - proof_location REQUIRED
+    FINAL RULES:
+    - If status == "Action Taken", proof must exist
+    - Proof = any non-empty proof_image_name
+    - proof_location is OPTIONAL
+    - Existing proof is preserved if no new proof is passed
     """
+
     status = str(status).strip()
 
     allowed = {"No Response", "Acknowledged", "On Hold", "Action Taken"}
     if status not in allowed:
         return False
-
-    if status == "Action Taken":
-        if not proof_image_name or not str(proof_image_name).strip():
-            return False
-        if not proof_location or not str(proof_location).strip():
-            return False
 
     data = read_json(_get_distress_file(), _default_payload())
     reports = data.get("reports", [])
@@ -248,20 +252,34 @@ def update_report_status(
 
     for report in reports:
         if report.get("report_id") == report_id:
+            existing_proof_image_name = report.get("proof_image_name")
+            existing_proof_location = report.get("proof_location", "") or ""
+
+            incoming_proof_image_name = str(proof_image_name).strip() if proof_image_name else ""
+            incoming_proof_location = str(proof_location).strip() if proof_location else ""
+
+            # Preserve old proof if no new proof provided
+            final_proof_image_name = incoming_proof_image_name or (str(existing_proof_image_name).strip() if existing_proof_image_name else "")
+            final_proof_location = incoming_proof_location or existing_proof_location
+
+            # Action Taken only allowed if ANY proof exists
+            if status == "Action Taken" and not final_proof_image_name:
+                return False
+
             report["status"] = status
             report["updated_at"] = now
             report["status_updated_at"] = now
             report["status_updated_by"] = str(ngo_username).strip()
             report["ngo_note"] = str(ngo_note).strip() if ngo_note else ""
 
-            if status == "Action Taken":
-                report["proof_image_name"] = str(proof_image_name).strip()
-                report["proof_location"] = str(proof_location).strip()
+            # Always preserve / update proof fields once they exist
+            report["proof_image_name"] = final_proof_image_name if final_proof_image_name else None
+            report["proof_location"] = final_proof_location
 
             updated = True
             break
 
     if updated:
-        write_json(_get_distress_file(), data)
+        return write_json(_get_distress_file(), data)
 
-    return updated
+    return False
