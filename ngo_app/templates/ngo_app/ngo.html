@@ -43,8 +43,8 @@
     gap: 24px;
     margin-bottom: 24px;
     align-items: start;
-    justify-content: start;   /* THIS is the key fix */
-    width: fit-content;       /* keeps both cards grouped together */
+    justify-content: start;
+    width: fit-content;
     max-width: 100%;
 }
 
@@ -60,7 +60,6 @@
     border:1px solid rgba(255,255,255,0.08);
     border-radius:16px;
     padding:18px;
-    
 }
 
 @media (max-width: 1100px) {
@@ -147,9 +146,7 @@
 .proof-block {
     margin-top:12px;
 }
-.proof-block-hidden {
-    display:none;
-}
+
 .ngo-two-col {
     display: grid;
     grid-template-columns: minmax(340px, 390px) minmax(560px, 760px);
@@ -661,12 +658,17 @@
             </div>
             {% endif %}
 
-            <form method="post" action="{% url 'ngo:update_report' report.report_id %}" enctype="multipart/form-data">
+            <form method="post"
+                  action="{% url 'ngo:update_report' report.report_id %}"
+                  enctype="multipart/form-data"
+                  data-has-proof="{% if report.proof_image_name %}true{% else %}false{% endif %}">
                 {% csrf_token %}
 
                 <div class="form-group">
                     <label class="form-label">Update Status</label>
-                    <select class="form-select" name="status" onchange="toggleActionProof(this, '{{ report.report_id }}')">
+                    <select class="form-select"
+                            name="status"
+                            onchange="validateActionTaken(this, '{{ report.report_id }}')">
                         <option value="No Response" {% if report.status == 'No Response' %}selected{% endif %}>No Response</option>
                         <option value="Acknowledged" {% if report.status == 'Acknowledged' %}selected{% endif %}>Acknowledged</option>
                         <option value="On Hold" {% if report.status == 'On Hold' %}selected{% endif %}>On Hold</option>
@@ -680,14 +682,28 @@
                               placeholder="e.g. Team dispatched. Vet contacted. Area visit scheduled...">{{ report.ngo_note }}</textarea>
                 </div>
 
-                <div id="proof-block-{{ report.report_id }}" class="proof-block {% if report.status != 'Action Taken' %}proof-block-hidden{% endif %}">
+                <div class="proof-block" style="margin-top:14px;">
                     <div class="form-group">
-                        <label class="form-label">Proof Photo (required for Action Taken)</label>
-                        <input type="file" class="form-file" name="proof_photo" accept=".jpg,.jpeg,.png">
+                        <label class="form-label">Upload Proof Photo (optional, but required before Action Taken)</label>
+                        <input type="file"
+                               class="form-file"
+                               name="proof_photo"
+                               accept=".jpg,.jpeg,.png"
+                               onchange="handleProofUpload(this, '{{ report.report_id }}')">
                     </div>
 
+                    {% if report.proof_image_name %}
+                    <div class="success-banner" style="margin-bottom:10px;">
+                        ✅ Proof already uploaded: {{ report.proof_image_name }}
+                    </div>
+                    {% else %}
+                    <div id="proof-status-{{ report.report_id }}" class="info-banner" style="margin-bottom:10px;">
+                        ℹ️ No proof uploaded yet.
+                    </div>
+                    {% endif %}
+
                     <div class="form-group">
-                        <label class="form-label">Proof Location (required)</label>
+                        <label class="form-label">Proof Location (optional)</label>
                         <input class="form-input" type="text" name="proof_location"
                                value="{{ report.proof_location|default:'' }}"
                                placeholder="e.g. Same spot / shifted to shelter / clinic location">
@@ -739,10 +755,33 @@ function toggleTicketDetails(reportId) {
     if (panel) panel.classList.toggle('open');
 }
 
-function toggleActionProof(selectEl, reportId) {
-    const block = document.getElementById('proof-block-' + reportId);
-    if (!block) return;
-    block.style.display = (selectEl.value === 'Action Taken') ? '' : 'none';
+function handleProofUpload(inputEl, reportId) {
+    const statusEl = document.getElementById('proof-status-' + reportId);
+    if (!statusEl) return;
+
+    if (inputEl.files && inputEl.files.length > 0) {
+        statusEl.className = 'success-banner';
+        statusEl.textContent = '✅ Proof selected: ' + inputEl.files[0].name;
+    } else {
+        statusEl.className = 'info-banner';
+        statusEl.textContent = 'ℹ️ No proof uploaded yet.';
+    }
+}
+
+function validateActionTaken(selectEl, reportId) {
+    if (selectEl.value !== 'Action Taken') return;
+
+    const form = selectEl.closest('form');
+    if (!form) return;
+
+    const proofInput = form.querySelector('input[name="proof_photo"]');
+    const hasNewFile = proofInput && proofInput.files && proofInput.files.length > 0;
+    const hadExistingProof = form.dataset.hasProof === 'true';
+
+    if (!hasNewFile && !hadExistingProof) {
+        alert('Please upload a proof photo before selecting Action Taken.');
+        selectEl.value = 'Acknowledged';
+    }
 }
 
 // NGO-specific location helpers
